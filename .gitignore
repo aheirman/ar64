@@ -9,7 +9,7 @@ rust/target
 *.elf
 *.bin
 *.pdf
-
+*.lock
 
 
 

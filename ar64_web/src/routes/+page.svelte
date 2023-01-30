@@ -11,12 +11,13 @@
 	*/
 
 	// TCP
-	const send_request = (task) => {
+	$: sim = {log: "", uart_out: "", mem: [], pc: -1, states: []}
+	const send_request = async (task) => {
 		const request = new Request('http://127.0.0.1:5173/api/ar64', {
-            method: 'PATCH',
-            body: JSON.stringify(task)
+            method: 'POST',
+            body: JSON.stringify(task)+"\r\n"+"\r\n"
         });
-        fetch(request)
+        return await fetch(request)
             .then(function (response) {
                 if (response.status == 200) {
                     return response.blob();
@@ -24,34 +25,37 @@
                 throw response.status;
             })
             .then(blob => blob.text())
-            
+			.then(txt => JSON.parse(txt))
             .then(function(response) {
-				//.then(txt => JSON.parse(txt))
+				//
                 // do something with the data sent in the request
-                console.log('page: got a response' + response + " end of response")
+                //console.log("page: got a response'" + response + "'")
                 if (response["error"] != undefined) {
                     console.log('page: ' + response["error"])
                 } else {
                     status = 'OK'
+					console.log(response)
+					return response;
                 }
             })
             .catch(function (response) {
                 console.log('page error: ', response)
                 status = 'Server error'
             });
+			return sim;
 	}
-	const handle_step = () => {
+	const handle_step = async () => {
         const task = {"action": "step"};
+		sim = await send_request(task);
 
-		send_request(task)
 	};
-	const handle_image_load = () => {
+	const handle_image_load = async () => {
         const task = {"action": "load image"};
-		send_request(task)
+		sim = await send_request(task);
 	};
-	const get_default_simulator = () => {
+	const get_default_simulator = async () => {
         const task = {"action": "init"};
-		send_request(task)
+		sim = await send_request(task);
 	};
 
 	let str = get_default_simulator();
@@ -59,7 +63,7 @@
 	// Agnostic
 	//$: sim = JSON.parse(str);
 	let status = "NO CONNECTION!"
-	$: sim = {log: "", uart_out: "", mem: [], pc: -1, states: []}
+	
 	$: log  = sim.log;
 	$: uart_out = sim.uart_out;
 	$: mem2D = gen2Dmem(sim);
@@ -67,7 +71,9 @@
 	function gen2Dmem(sim) {
 		if (typeof sim !== 'undefined') {
 			const mem2D = [];
-			while(sim.mem.length) mem2D.push(sim.mem.splice(0,8));
+			while(sim['mem'].length) {
+				mem2D.push(sim['mem'].splice(0,8));
+			}
 			
 			return mem2D;
 		} 
