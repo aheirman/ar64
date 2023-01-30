@@ -1,0 +1,8 @@
+https://luplab.gitlab.io/rvcodecjs/#q=0x00080093&abi=false&isa=AUTO
+
+Intentional spec disregards
+
+1) No instruction fetch misaligned exception is generated for a conditional branch that is not taken
+
+Intentional spec regards
+1) unaligned loads and stores

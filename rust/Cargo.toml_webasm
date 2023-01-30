@@ -1,0 +1,20 @@
+[package]
+name = "ar64"
+version = "0.1.0"
+edition = "2021"
+
+
+
+#[lib]
+#name = "wasm_lib"
+#crate-type = ["cdylib", "rlib"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+mio = {version = "0.8", features = ["os-poll", "net"] }
+
+#wasm-bindgen = "*"
+#serde = { version = "1.0", features = ["derive"] }
+#serde_json = "1.0"
+#once_cell = "*"

@@ -1,0 +1,19 @@
+AR64
+Aron's Risc-V64 sim
+
+# TO READ:
+https://github.com/pretzelhammer/rust-blog/blob/master/posts/common-rust-lifetime-misconceptions.md#2-if-t-static-then-t-must-be-valid-for-the-entire-program
+
+## Website to decode an instruction, note they use big-endian instead of the default little endian?
+https://riscvasm.lucasteske.dev/#
+
+
+
+# WEBASM
+https://www.secondstate.io/articles/wasi-access-system-resources/
+https://web.dev/read-files/
+
+https://github.com/WICG/file-system-access/issues/139
+https://wicg.github.io/file-system-access/#api-getsystemdirectory
+https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API
+https://fs.spec.whatwg.org/
