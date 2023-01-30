@@ -11,7 +11,6 @@
 	*/
 
 	// TCP
-	let status = "OK"
 	const send_request = (task) => {
 		const request = new Request('http://127.0.0.1:5173/api/ar64', {
             method: 'PATCH',
@@ -29,15 +28,15 @@
             .then(function(response) {
 				//.then(txt => JSON.parse(txt))
                 // do something with the data sent in the request
-                console.log('got a response' + response + "end of response")
+                console.log('page: got a response' + response + " end of response")
                 if (response["error"] != undefined) {
-                    console.log(response["error"])
+                    console.log('page: ' + response["error"])
                 } else {
                     status = 'OK'
                 }
             })
             .catch(function (response) {
-                console.log('error: ', response)
+                console.log('page error: ', response)
                 status = 'Server error'
             });
 	}
@@ -59,6 +58,7 @@
 	
 	// Agnostic
 	//$: sim = JSON.parse(str);
+	let status = "NO CONNECTION!"
 	$: sim = {log: "", uart_out: "", mem: [], pc: -1, states: []}
 	$: log  = sim.log;
 	$: uart_out = sim.uart_out;
