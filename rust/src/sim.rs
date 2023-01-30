@@ -43,7 +43,7 @@ pub fn default_sim() -> Simulator {
     return Simulator{
         states: states,
         // fill mem with NOP
-        mem: vec![0; 128],
+        mem: vec![0; 8192],
         log: String::from("OK"),
         uart_out: String::from(""),
     };
@@ -61,8 +61,10 @@ pub fn step(sim: &mut Simulator) {
 
         // fetch
         let mut pc = state.pc;
-        let ir: u32 = u32::from_be_bytes(mem[pc as usize .. (pc + 4) as usize ].try_into().unwrap());
+        let ir: u32 = u32::from_le_bytes(mem[pc as usize .. (pc + 4) as usize ].try_into().unwrap());
         
+        sim.uart_out = format!("{:X}", ir);
+
         let mut err = format!("0b{:b} ", ir);
         err.push_str(&String::from("illegal instruction"));
     
@@ -78,8 +80,13 @@ pub fn step(sim: &mut Simulator) {
         let mut rs1i:   u8 = 0;
         let mut rs2i:   u8 = 0;
         let mut rdi:    u8 = 0;
-        if (ir ^ 0b0111111) == 0b1111111 { 
+        
+        //64 bit instructions
+        //if (ir ^ 0b0111111) & 0b1111111 != 0 { 
+        // 32 bit
+        if ((ir & 0b11) != 3) || ((ir & 0b11100) == 0b11100)  {
             sim.log = err;
+            println!("errored on: {}", line!());
             return
         }
 
@@ -104,8 +111,8 @@ pub fn step(sim: &mut Simulator) {
             }, 
 
             // S-type
-            0b10000 => { // STORES
-                imm   =  (ir >>  7) & 0b11111 | (ir >>  25) & 0b1111111;
+            0b01000 => { // STORES
+                imm   =  (ir >>  7) & 0b11111 | ((ir >>  25) & 0b1111111) << 5;
                 rs2i  = ((ir >> 20) & 0b11111) as u8;
                 rs1i  = ((ir >> 15) & 0b11111) as u8;
                 func3 = ((ir >> 12) & 0b00111) as u8;
@@ -139,18 +146,19 @@ pub fn step(sim: &mut Simulator) {
 
             _ => { 
                 sim.log = err;
+                println!("errored on: {}", line!());
                 return
             }
         }
 
-        let mut rs1: u64 = 0;
-        let mut rs2: u64 = 0;
+        let mut rs1: u64 = regs[rs1i];
+        let mut rs2: u64 = regs[rs2i];
         let mut rd:  u64 = 0;
 
         // execute
         sim.log = String::from("execute");
 
-        sim.uart_out = format!("rs1i: {:}, rs1: {:}, rs2i: {:}, rs2: {:}, rdi: {:}, imm: {:}, func3: {:}, func7: {:}", rs1i, rs1, rs2i, rs2, rdi, imm, func3, func7);
+        sim.uart_out.push_str(&*format!("\r\nrs1i: {:}, rs1: {:}, rs2i: {:}, rs2: {:}, rdi: {:}, imm: {:}, func3: {:}, func7: {:}", rs1i, rs1, rs2i, rs2, rdi, imm, func3, func7));
 
         // Instruction Set Listings p 130
         // TODO: sign extend to 64 not 32bits?
@@ -183,7 +191,7 @@ pub fn step(sim: &mut Simulator) {
                     0b101 => { if (rs1 as i64) >= (rs2 as i64) {pc = addr;} }
                     0b110 => { if (rs1 as u64) <  (rs2 as u64) {pc = addr;} }
                     0b111 => { if (rs1 as u64) >= (rs2 as u64) {pc = addr;} }
-                    _     => {trap = 1;}
+                    _     => {trap = 1;println!("errored on: {}", line!());}
                 }
             },
             0b00000 => { // Loads
@@ -200,7 +208,7 @@ pub fn step(sim: &mut Simulator) {
                     0b010 => { rd = i32::from_le_bytes(mem[address as usize .. (address + 4) as usize ].try_into().unwrap()) as u64; },
                     0b100 => { rd = mem[address as usize] as u64 },
                     0b101 => { rd = u16::from_le_bytes(mem[address as usize .. (address + 2) as usize ].try_into().unwrap()) as u64; },
-                    _     => {trap = 1;},
+                    _     => {trap = 1;println!("errored on: {}", line!());},
                 }
             },
             0b01000 => { // Stores
@@ -208,8 +216,10 @@ pub fn step(sim: &mut Simulator) {
                 // SB SH SW
 
                 // TODO pipeline out
-                if imm & 08100 != 0 {imm |= 0xfffff000; }
+                // store zero extends number
                 let address = rs1 + (imm as i32 as u64);
+                println!("Stored rs2({:}): {:} at: {:} with func3: {}", rs2i, rs2, address, func3);
+                println!("Stored {}, {}, {}", rs1i, rs1, imm);
                 match func3 {
                     0b000 => { 
                         mem[address as usize] = rs2 as u8;
@@ -224,7 +234,17 @@ pub fn step(sim: &mut Simulator) {
                         mem[(address + 2) as usize] = (rs2 >> 16) as u8;
                         mem[(address + 3) as usize] = (rs2 >> 24) as u8;
                     },
-                    _     => {trap = 1;},
+                    0b011 => {
+                        mem[ address      as usize] =  rs2        as u8;
+                        mem[(address + 1) as usize] = (rs2 >>  8) as u8;
+                        mem[(address + 2) as usize] = (rs2 >> 16) as u8;
+                        mem[(address + 3) as usize] = (rs2 >> 24) as u8;
+                        mem[(address + 4) as usize] = (rs2 >> 32) as u8;
+                        mem[(address + 5) as usize] = (rs2 >> 40) as u8;
+                        mem[(address + 6) as usize] = (rs2 >> 48) as u8;
+                        mem[(address + 7) as usize] = (rs2 >> 56) as u8;
+                    }
+                    _     => {trap = 1;println!("errored on: {}", line!());},
                 }
             },
             0b00100 | 0b01100 => {
@@ -233,8 +253,8 @@ pub fn step(sim: &mut Simulator) {
                 let is_imm: bool = (opcode & 0b01000) == 0;
                 if is_imm {
                     if imm & 0x00000800 != 0 {imm |= 0xfffff000; }
-                    rs2 = imm as u64;
-                    println!("Used immediate {rs2}, {rs2:#b}");
+                    rs2 = imm as i32 as i64 as u64;
+                    println!("Used immediate {:}, {:#b}", rs2 as i64, rs2 as i64);
                 }
 
 
@@ -244,6 +264,7 @@ pub fn step(sim: &mut Simulator) {
                     0b001 => {
                         if rs2 > 63 {
                             sim.log = String::from("Attempted to bit shift left too much!");
+                            println!("errored on: {}", line!());
                             return
                         }
                         rd = rs1 << rs2
@@ -269,6 +290,7 @@ pub fn step(sim: &mut Simulator) {
             
             _ => {
                 sim.log = err;
+                println!("errored on: {}", line!());
                 return
             },
         }

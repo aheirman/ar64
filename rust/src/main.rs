@@ -80,7 +80,15 @@ fn handle_connection(mut stream: TcpStream, sim: &mut Simulator ) {
                     match res {
                         Err(e) => {sim.log =  String::from(format!("ERRROR: failed to load image! {:?}", e))},
                         Ok(file) => {
-                            sim.mem = file.to_vec();
+                            //sim.mem = file.to_vec();
+                            for i in 0..file.len() {
+                                sim.mem[i] = file[i]
+                            }
+                            for i in file.len()..sim.mem.len() {
+                                sim.mem[i] = 0
+                            }
+
+
                         },
                     }
                     
