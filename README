@@ -1,15 +1,19 @@
 AR64
 Aron's Risc-V64 sim
 
-# TO READ:
-https://github.com/pretzelhammer/rust-blog/blob/master/posts/common-rust-lifetime-misconceptions.md#2-if-t-static-then-t-must-be-valid-for-the-entire-program
+# PRIORITY 1:
+https://wiki.osdev.org/Linker_Scripts
+
+
+https://twilco.github.io/riscv-from-scratch/2019/07/28/riscv-from-scratch-4.html
 
 ## Website to decode an instruction, note they use big-endian instead of the default little endian?
 https://riscvasm.lucasteske.dev/#
 
+## Backburner
+https://github.com/pretzelhammer/rust-blog/blob/master/posts/common-rust-lifetime-misconceptions.md#2-if-t-static-then-t-must-be-valid-for-the-entire-program
 
-
-# WEBASM
+# Archaic WEBASM
 https://www.secondstate.io/articles/wasi-access-system-resources/
 https://web.dev/read-files/
 

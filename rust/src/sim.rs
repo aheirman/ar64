@@ -151,8 +151,8 @@ pub fn step(sim: &mut Simulator) {
             }
         }
 
-        let mut rs1: u64 = regs[rs1i];
-        let mut rs2: u64 = regs[rs2i];
+        let mut rs1: u64 = state.regs[rs1i as usize];
+        let mut rs2: u64 = state.regs[rs2i as usize];
         let mut rd:  u64 = 0;
 
         // execute
