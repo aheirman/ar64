@@ -23,6 +23,8 @@ pub struct CpuState {
     // regs[5] alternate link register
     pub regs : Vec<u64>, 
     pub pc   : u64,
+    pub last_pc : u64,
+    pub last_instruction : String,
 
      
 }
@@ -32,6 +34,8 @@ pub fn default_cpu_state() -> CpuState {
     return CpuState {
             regs: vec![0; 32],
             pc:   0,
+            last_pc : 0,
+            last_instruction : String::from("")
         };
 }
 
@@ -58,12 +62,15 @@ pub fn step(sim: &mut Simulator) {
 
     for i in 0..states.len(){
         let mut state = &mut states[i];
-
+        
         // fetch
         let mut pc = state.pc;
+        state.last_pc = pc;
         let ir: u32 = u32::from_le_bytes(mem[pc as usize .. (pc + 4) as usize ].try_into().unwrap());
         
-        sim.uart_out = format!("{:X}", ir);
+        //sim.uart_out = format!("{:X}", ir);
+        sim.uart_out = String::from("");
+        state.last_instruction = format!("{:X}", ir);
 
         let mut err = format!("0b{:b} ", ir);
         err.push_str(&String::from("illegal instruction"));
@@ -101,8 +108,8 @@ pub fn step(sim: &mut Simulator) {
                 rdi   = ((ir >>  7) & 0b11111) as u8;
             }
 
-            // I-type [JARL | LOAD]
-            0b11001 | 0b00000 | 0b00100 => { 
+            // I-type [JARL | LOAD | ADD+ | ADDIW
+            0b11001 | 0b00000 | 0b00100 | 0b00110 => { 
                 //rs1 = state.regs[(ir & 0x00f8000) as usize];
                 imm   =   ir >> 20;
                 rs1i  = ((ir >> 15) & 0b11111) as u8;
@@ -122,7 +129,7 @@ pub fn step(sim: &mut Simulator) {
             0b11000 => { 
                 imm = (ir & 0x80000000) >> 19 |
                     (ir & 0x7e000000) >> 20 |
-                    (ir & 0x00000400) >> 7  |
+                    (ir & 0x00000f00) >> 7  |
                     (ir & 0x00000080) << 4;
                 rs2i  =((ir >> 20) & 0b11111) as u8;
                 rs1i  =((ir >> 15) & 0b11111) as u8;
@@ -138,7 +145,7 @@ pub fn step(sim: &mut Simulator) {
             //J-type [JAL]
             0b11011 => { 
                 imm = (ir & 0x80000000) >> 11 |
-                    (ir & 0x7fe00000) >> 10 |
+                    (ir & 0x7fe00000) >> 20 |
                     (ir & 0x00100000) >> 9  |
                     (ir & 0x000ff000);
                 rdi =((ir >>  7) & 0b11111) as u8;
@@ -170,7 +177,8 @@ pub fn step(sim: &mut Simulator) {
             0b11011 => { // JAL: Jump and link
                 if imm & 0x00100000 != 0 {imm |= 0xffe00000; }
                 rd  = pc  + 4;
-                pc += imm as i64 as u64 - 4;
+                println!("JAL: imm: {}", imm as i64);
+                pc += imm as i32 as i64 as u64 - 4;
                 //TODO: gen instruction-address-misaligned exception if the target address is not aligned to a four-byte boundary.
             }, 
             0b11001 => { // JALR: Jump and link indirect
@@ -180,10 +188,11 @@ pub fn step(sim: &mut Simulator) {
                 //TODO: gen instruction-address-misaligned exception if the target address is not aligned to a four-byte boundary.
             }, 
             0b11000 => { // BEQ
-                if imm & 0x100 != 0 {imm |= 0xffffe000; }
+                if imm & 0x1000 != 0 {imm |= 0xffffe000; }
                 let addr = pc + imm as i64 as u64 -4;
 
                 // BEQ BNE BLT BGE BLTU BGEU
+                println!("BEQ+: r{:}:{:} op r{:}:{:}; addr: {:X}={:X}+{}-4", rs1i, rs1, rs2i, rs2, addr, pc, imm);
                 match func3 {
                     0b000 => { if  rs1 == rs2 {pc = addr;} }
                     0b001 => { if  rs1 != rs2 {pc = addr;} }
@@ -217,9 +226,10 @@ pub fn step(sim: &mut Simulator) {
 
                 // TODO pipeline out
                 // store zero extends number
-                let address = rs1 + (imm as i32 as u64);
-                println!("Stored rs2({:}): {:} at: {:} with func3: {}", rs2i, rs2, address, func3);
-                println!("Stored {}, {}, {}", rs1i, rs1, imm);
+                if imm & 0x800 != 0 {imm |= 0xfffff000; }
+                let address = rs1 + (imm as i32 as i64 as u64);
+                println!("Stored rs{:}: {:} at (imm + r{:}): {:}+0x{:X}=0x{:X} with func3: {}", rs2i, rs2, rs1i, imm as i32 as i64, rs1, address, func3);
+                //println!("Stored address calc r{}: {}, immediate {}", rs1i, rs1, imm);
                 match func3 {
                     0b000 => { 
                         mem[address as usize] = rs2 as u8;
@@ -250,6 +260,8 @@ pub fn step(sim: &mut Simulator) {
             0b00100 | 0b01100 => {
                 // ADDI SLTI SLTIU XORI ANDI SLLI SDAI
                 // ADD SUB SLL SLT SLTU XOR SRL SRA OR AND
+
+                // Checks in the opcode
                 let is_imm: bool = (opcode & 0b01000) == 0;
                 if is_imm {
                     if imm & 0x00000800 != 0 {imm |= 0xfffff000; }
@@ -277,7 +289,8 @@ pub fn step(sim: &mut Simulator) {
                     0b111 => {rd = rs1 & rs2}, //AND I AND
                     _ => {
                         sim.log = err;
-                        println!("ERROR! incorrect func3!")
+                        println!("ERROR! incorrect func3!, line: {}", line!());
+                        return
                     }
                 }
             },
@@ -286,6 +299,39 @@ pub fn step(sim: &mut Simulator) {
             },
             0b111001 => {
                 // ECALL | EBREAK
+            },
+
+            //---------
+            //- RV64i -
+            //---------
+            0b00110 => {
+
+                // SEXT
+                if imm & 0x00000800 != 0 {imm |= 0xfffff000; }
+                rs2 = imm as i32 as i64 as u64;
+                println!("Used immediate {:}, {:#b}", rs2 as i64, rs2 as i64);
+
+                match func3 {
+                    0b000 => {
+                        // ADDIW
+                        rd = (rs1+rs2) & 0xffffffff;
+                        if rd & 0x80000000 != 0 {rd |= 0xffffffff00000000; }
+                    },
+                    0b001 => {
+                        //SLLIW
+                        println!("errored on: {}", line!());
+                    },
+                    0b101 => {
+                        //SRLIW & SRAIW
+                        println!("errored on: {}", line!());
+                        rd = if (ir & 0x40000000) != 0 { (rs1 as i64 >> rs2) as u64 } else {rs1 >> rs2 }
+                    },
+                    _ => {
+                        sim.log = err;
+                        println!("ERROR! incorrect func3!, line: {}", line!());
+                        return
+                    }
+                }
             },
             
             _ => {

@@ -1,4 +1,7 @@
 <script>
+	export const prerender = false
+
+
 	/* WASM
 	export let bindings;
 	function handleStep(){
@@ -11,7 +14,7 @@
 	*/
 
 	// TCP
-	$: sim = {log: "", uart_out: "", mem: [], pc: -1, states: []}
+	$: sim = {log: "", uart_out: "", mem: [], states: [{last_instruction : "", pc : -1, last_pc : -1, regs : []}]}
 	const send_request = async (task) => {
 		const request = new Request('http://127.0.0.1:5173/api/ar64', {
             method: 'POST',
@@ -34,7 +37,7 @@
                     console.log('page: ' + response["error"])
                 } else {
                     status = 'OK'
-					console.log(response)
+					//console.log(response)
 					return response;
                 }
             })
@@ -61,18 +64,20 @@
 	let str = get_default_simulator();
 	
 	// Agnostic
-	//$: sim = JSON.parse(str);
 	let status = "NO CONNECTION!"
 	
 	$: log  = sim.log;
 	$: uart_out = sim.uart_out;
 	$: mem2D = gen2Dmem(sim);
 
+	$: instruction_url = "https://luplab.gitlab.io/rvcodecjs/#q="+sim.states[0].last_instruction
+	
+	const bytes_per_row = 4
 	function gen2Dmem(sim) {
 		if (typeof sim !== 'undefined') {
 			const mem2D = [];
 			while(sim['mem'].length) {
-				mem2D.push(sim['mem'].splice(0,8));
+				mem2D.push(sim['mem'].splice(0,bytes_per_row));
 			}
 			
 			return mem2D;
@@ -115,14 +120,14 @@
 			<div class="memory">
 				<div class="row-index">
 					{#each mem2D as row, i}
-						<div>{i*8}</div>
+						<div>{(i*bytes_per_row).toString(16)}</div>
 					{/each}
 				</div>
 				<div>
 				{#each mem2D as row, i}
 					<div class="row">
 					{#each row as v, j}
-						<div style="color: {i*8 + j - state.pc in [0, 1, 2, 3] ? '#333': '#ccc'}">{(v).toString(16).padStart(2,'0')}</div>
+						<div style="color: {(i*bytes_per_row + j - state.pc in [0, 1, 2, 3]) ? '#333': ((i*bytes_per_row + j - state.last_pc in [0, 1, 2, 3]) ? '#afa': '#999')}">{(v).toString(16).padStart(2,'0')}</div>
 					{/each}
 					</div>
 				{/each}
@@ -133,6 +138,9 @@
 		<div class="uart">
 			{uart_out}
 		</div>
+		{#key instruction_url}
+		<iframe width="500" height="500" src={instruction_url}></iframe>
+		{/key}
 	</div>
 	</div>
 </body>
