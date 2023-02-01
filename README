@@ -8,6 +8,21 @@ riscv
 https://msyksphinz-self.github.io/riscv-isadoc/html/rv64i.html
 https://msyksphinz-self.github.io/riscv-isadoc/html/rvi.html#addi
 
+
+https://www.youtube.com/watch?v=dOfucXtyEsU
+
+# interrupts (core local interrupts: CLINT)
+https://chromitem-soc.readthedocs.io/en/latest/clint.html
+
+# device tree
+https://elinux.org/Device_Tree_Usage#chosen_Node
+
+# uart
+https://www.lammertbies.nl/comm/info/serial-uart
+https://twilco.github.io/riscv-from-scratch/2019/04/27/riscv-from-scratch-2.html
+https://osblog.stephenmarz.com/ch2.html
+
+
 # linking
 https://wiki.osdev.org/Linker_Scripts
 https://mcyoung.xyz/2021/06/01/linker-script/#object-files-and-sections

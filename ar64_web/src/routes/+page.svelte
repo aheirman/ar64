@@ -14,7 +14,7 @@
 	*/
 
 	// TCP
-	$: sim = {log: "", uart_out: "", mem: [], states: [{last_instruction : "", pc : -1, last_pc : -1, regs : []}]}
+	$: sim = {log: "", uart_out: "", sim_out: "", mem: [], states: [{last_instruction : "", pc : -1, last_pc : -1, regs : []}]}
 	const send_request = async (task) => {
 		const request = new Request('http://127.0.0.1:5173/api/ar64', {
             method: 'POST',
@@ -67,7 +67,8 @@
 	let status = "NO CONNECTION!"
 	
 	$: log  = sim.log;
-	$: uart_out = sim.uart_out;
+	$: uart_out = String.fromCharCode(...sim.uart_out);
+	$: sim_out = sim.sim_out;
 	$: mem2D = gen2Dmem(sim);
 
 	$: instruction_url = "https://luplab.gitlab.io/rvcodecjs/#q="+sim.states[0].last_instruction
@@ -138,9 +139,14 @@
 		<div class="uart">
 			{uart_out}
 		</div>
-		{#key instruction_url}
-		<iframe width="500" height="500" src={instruction_url}></iframe>
-		{/key}
+		<div>
+			{#key instruction_url}
+			<iframe width="500" height="500" src={instruction_url}></iframe>
+			{/key}
+			<div class="uart">
+				{sim_out}
+			</div>
+		</div>
 	</div>
 	</div>
 </body>

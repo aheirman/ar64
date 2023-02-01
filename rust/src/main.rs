@@ -69,7 +69,7 @@ fn handle_connection(mut stream: TcpStream, sim: &mut Simulator ) {
                     contents = serde_json::to_string(&sim).unwrap();
                 }
                 "step" => {
-                    println!("STEP");
+                    //println!("STEP");
                     step(sim);
                     contents = serde_json::to_string(&sim).unwrap();
                 }

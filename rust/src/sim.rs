@@ -12,7 +12,9 @@ pub struct Simulator {
     pub states:   Vec<CpuState>,
     pub mem:      Vec<u8>,
     pub log:      String,
-    pub uart_out: String,
+    pub sim_out:  String,
+    pub uart_out: Vec<u8>,
+    pub state:    bool,
 }
 
 
@@ -49,13 +51,85 @@ pub fn default_sim() -> Simulator {
         // fill mem with NOP
         mem: vec![0; 8192],
         log: String::from("OK"),
-        uart_out: String::from(""),
+        sim_out: String::from(""),
+        uart_out: vec![],
+        state: true,
     };
 }
 
+fn load(mem: &mut Vec<u8>, func3: u8, address: u64) -> u64{
+    let mut rd = 0;
+
+    if address < 0x1000 {
+        
+        match func3 {
+            0b000 => { rd = mem[address as usize] as i8 as u64 },
+            0b001 => { rd = i16::from_le_bytes(mem[address as usize .. (address + 2) as usize ].try_into().unwrap()) as u64; },
+            0b010 => { rd = i32::from_le_bytes(mem[address as usize .. (address + 4) as usize ].try_into().unwrap()) as u64; },
+            0b100 => { rd = mem[address as usize] as u64 },
+            0b101 => { rd = u16::from_le_bytes(mem[address as usize .. (address + 2) as usize ].try_into().unwrap()) as u64; },
+            0b011 => { rd = i64::from_le_bytes(mem[address as usize .. (address + 8) as usize ].try_into().unwrap()) as u64; }
+            _     => {
+                //trap = 1;
+                println!("errored on: {}, func3: {:#b}", line!(), func3);
+            },
+        }
+        
+    } 
+    else if address == 0x10000000 {
+        // uart
+    } else if address <= 0x1000007 {
+        println!("WARN on: {}, READING UART STATUS REGISTERS IS NOT SUPPORTED, address: {:X}", line!(), address);
+    } else {
+        println!("errored on: {}, address: {:X}", line!(), address);
+        //sim.state = false;
+    }
+    return rd;
+}
+
+fn store(mem: &mut Vec<u8>, func3: u8, address: u64, rs2: u64, uart_out: &mut Vec<u8>){
+    if address < 0x1000 {
+        match func3 {
+            0b000 => { 
+                mem[address as usize] = rs2 as u8;
+            },
+            0b001 => { 
+                mem[ address      as usize] =  rs2       as u8;
+                mem[(address + 1) as usize] = (rs2 >> 8) as u8;
+            },
+            0b010 => {
+                mem[ address      as usize] =  rs2        as u8;
+                mem[(address + 1) as usize] = (rs2 >>  8) as u8;
+                mem[(address + 2) as usize] = (rs2 >> 16) as u8;
+                mem[(address + 3) as usize] = (rs2 >> 24) as u8;
+            },
+            0b011 => {
+                mem[ address      as usize] =  rs2        as u8;
+                mem[(address + 1) as usize] = (rs2 >>  8) as u8;
+                mem[(address + 2) as usize] = (rs2 >> 16) as u8;
+                mem[(address + 3) as usize] = (rs2 >> 24) as u8;
+                mem[(address + 4) as usize] = (rs2 >> 32) as u8;
+                mem[(address + 5) as usize] = (rs2 >> 40) as u8;
+                mem[(address + 6) as usize] = (rs2 >> 48) as u8;
+                mem[(address + 7) as usize] = (rs2 >> 56) as u8;
+            }
+            _     => {
+                //trap = 1;
+                println!("errored on: {}", line!());
+            },
+        }
+    } else if address == 0x10000000 {
+        // UART
+        uart_out.push(rs2 as u8)
+    } else if address <= 0x1000007 {
+        println!("WARN on: {}, WRITING UART STATUS REGISTERS IS NOT SUPPORTED, address: {:X}, value: {:X}", line!(), address, rs2);
+    } else {
+        println!("errored on: {}, address: {:X}", line!(), address);
+        //sim.state = false;
+    }
+}
 pub fn step(sim: &mut Simulator) {
     let states = &mut sim.states;
-    let mem    = &mut sim.mem;
 
 
 
@@ -66,10 +140,10 @@ pub fn step(sim: &mut Simulator) {
         // fetch
         let mut pc = state.pc;
         state.last_pc = pc;
-        let ir: u32 = u32::from_le_bytes(mem[pc as usize .. (pc + 4) as usize ].try_into().unwrap());
+        let ir: u32 = u32::from_le_bytes(sim.mem[pc as usize .. (pc + 4) as usize ].try_into().unwrap());
         
-        //sim.uart_out = format!("{:X}", ir);
-        sim.uart_out = String::from("");
+        // clear sim out
+        sim.sim_out = String::from("");
         state.last_instruction = format!("{:X}", ir);
 
         let mut err = format!("0b{:b} ", ir);
@@ -165,7 +239,7 @@ pub fn step(sim: &mut Simulator) {
         // execute
         sim.log = String::from("execute");
 
-        sim.uart_out.push_str(&*format!("\r\nrs1i: {:}, rs1: {:}, rs2i: {:}, rs2: {:}, rdi: {:}, imm: {:}, func3: {:}, func7: {:}", rs1i, rs1, rs2i, rs2, rdi, imm, func3, func7));
+        sim.sim_out.push_str(&*format!("\r\nrs1i: {:}, rs1: {:}, rs2i: {:}, rs2: {:}, rdi: {:}, imm: {:}, func3: {:}, func7: {:}", rs1i, rs1, rs2i, rs2, rdi, imm, func3, func7));
 
         // Instruction Set Listings p 130
         // TODO: sign extend to 64 not 32bits?
@@ -210,52 +284,16 @@ pub fn step(sim: &mut Simulator) {
 
                 if imm & 0x800 != 0 {imm |= 0xfffff000; }
                 let address = rs1 + (imm as i32 as u64);
-
-                match func3 {
-                    0b000 => { rd = mem[address as usize] as i8 as u64 },
-                    0b001 => { rd = i16::from_le_bytes(mem[address as usize .. (address + 2) as usize ].try_into().unwrap()) as u64; },
-                    0b010 => { rd = i32::from_le_bytes(mem[address as usize .. (address + 4) as usize ].try_into().unwrap()) as u64; },
-                    0b100 => { rd = mem[address as usize] as u64 },
-                    0b101 => { rd = u16::from_le_bytes(mem[address as usize .. (address + 2) as usize ].try_into().unwrap()) as u64; },
-                    _     => {trap = 1;println!("errored on: {}", line!());},
-                }
+                rd = load(&mut sim.mem, func3, address);
             },
             0b01000 => { // Stores
                 // S-type
-                // SB SH SW
 
                 // TODO pipeline out
-                // store zero extends number
                 if imm & 0x800 != 0 {imm |= 0xfffff000; }
                 let address = rs1 + (imm as i32 as i64 as u64);
                 println!("Stored rs{:}: {:} at (imm + r{:}): {:}+0x{:X}=0x{:X} with func3: {}", rs2i, rs2, rs1i, imm as i32 as i64, rs1, address, func3);
-                //println!("Stored address calc r{}: {}, immediate {}", rs1i, rs1, imm);
-                match func3 {
-                    0b000 => { 
-                        mem[address as usize] = rs2 as u8;
-                    },
-                    0b001 => { 
-                        mem[ address      as usize] =  rs2       as u8;
-                        mem[(address + 1) as usize] = (rs2 >> 8) as u8;
-                    },
-                    0b010 => {
-                        mem[ address      as usize] =  rs2        as u8;
-                        mem[(address + 1) as usize] = (rs2 >>  8) as u8;
-                        mem[(address + 2) as usize] = (rs2 >> 16) as u8;
-                        mem[(address + 3) as usize] = (rs2 >> 24) as u8;
-                    },
-                    0b011 => {
-                        mem[ address      as usize] =  rs2        as u8;
-                        mem[(address + 1) as usize] = (rs2 >>  8) as u8;
-                        mem[(address + 2) as usize] = (rs2 >> 16) as u8;
-                        mem[(address + 3) as usize] = (rs2 >> 24) as u8;
-                        mem[(address + 4) as usize] = (rs2 >> 32) as u8;
-                        mem[(address + 5) as usize] = (rs2 >> 40) as u8;
-                        mem[(address + 6) as usize] = (rs2 >> 48) as u8;
-                        mem[(address + 7) as usize] = (rs2 >> 56) as u8;
-                    }
-                    _     => {trap = 1;println!("errored on: {}", line!());},
-                }
+                store(&mut sim.mem, func3, address, rs2, &mut sim.uart_out);
             },
             0b00100 | 0b01100 => {
                 // ADDI SLTI SLTIU XORI ANDI SLLI SDAI
