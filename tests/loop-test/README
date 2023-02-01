@@ -1,0 +1,12 @@
+clang --target=riscv64-unknown-none-elf add.c -o add.elf -nostdlib -march=rv64i -mabi=lp64
+
+clang --target=riscv64-unknown-none-elf add.c -o add.elf -nostdlib -march=rv64i -mabi=lp64 -Wl,-T,link.ld
+
+clang --target=riscv64-lp64-none-elf add.S add.c -o add.elf -nostdlib -march=rv64i -mabi=lp64 -Wl,-T,link.ld
+
+llvm-objcopy add.elf -O binary ../../image
+
+#llvm-objcopy add.elf -O binary add.bin
+
+# nm - list symbols from object files
+# llvm-objdump add.elf -d
