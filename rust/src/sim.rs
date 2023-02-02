@@ -11,6 +11,7 @@ use serde::{Serialize, Deserialize};
 pub struct Simulator {
     pub states:   Vec<CpuState>,
     pub mem:      Vec<u8>,
+    pub csr:      Vec<u64>,
     pub log:      String,
     pub sim_out:  String,
     pub uart_out: Vec<u8>,
@@ -50,11 +51,154 @@ pub fn default_sim() -> Simulator {
         states: states,
         // fill mem with NOP
         mem: vec![0; 8192],
+        csr: vec![0;4096],
         log: String::from("OK"),
         sim_out: String::from(""),
         uart_out: vec![],
         state: true,
     };
+}
+
+#[derive(Copy, Clone)]
+pub enum CsrAddress {
+    SATP    = 0x180,
+    MSTATUS = 0x300,
+}
+
+/*
+    Virtual addresses
+        4.3.2 p 82
+        PTE = page table entries
+        PPN = physical page number
+        VPN = virtual page number
+        PMA = 
+        PMP = 
+        va  = virtual address
+
+        WPRI = reserved Writes Preserve values, Reads Ignore values
+        WLRL = Write Legal Read Legal
+        WARL = Write Any values, Read Legal values
+
+    CSRs listed in table 2.2 etc
+*/
+
+// access_type
+// 0 read
+// 1 write
+// 2 execute
+fn translate_address(csr : Vec<u64>, mem : Vec<u8>, va : u64, access_type : u8) -> u64{
+    // Sv39
+    const PAGESIZE: u64 = 4096;
+    const LEVELS:   u64 = 3;
+    const PTESIZE:  u64 = 8;
+
+
+    // Supervisor Address Translation and Protection register
+    let satp    = csr[CsrAddress::SATP    as usize];
+    let mstatus = csr[CsrAddress::MSTATUS as usize];
+
+    // physical page number
+    let satp_ppn   = satp & 0xfffffffffff; // bottom 44 bits
+
+    // address space identifier
+    //satp_asid: 44 to 59
+
+    
+    //let satp_mode  = satp & 0xF000000000000000 >> 60;// 60 to 63
+
+    
+    //the effecitve privilege mode must be S or U
+    let satp_active = false;
+    if satp_active {
+        let mut i = LEVELS - 1;
+        let mut a = satp_ppn * PAGESIZE;
+
+        while i > 0 {
+            let va_vpn = [(va >> 12) & 0x1ff, (va >> 21) & 0x1ff, (va >> 30) & 0x1ff]; 
+            
+
+            let va_vpn_i = va_vpn[i as usize];
+            
+            let address = (a + va_vpn_i*PTESIZE)  as usize;
+            let pte = u64::from_le_bytes(mem[address as usize .. (address + 8) as usize ].try_into().unwrap());
+            //TODO generate access fault if needed
+
+            let pte_v = pte & 0b00000001;
+            let pte_r = pte & 0b00000010;
+            let pte_w = pte & 0b00000100;
+            let pte_x = pte & 0b00001000;
+            let pte_u = pte & 0b00010000;
+            let pte_g = pte & 0b00100000;
+            let pte_a = pte & 0b01000000;
+            let pte_d = pte & 0b10000000;
+
+            let pte_unsupported = pte & 0xFFC0000000000000;
+            if (pte_v != 0) || (pte_r != 0 && pte_w != 1)  ||  (pte_unsupported != 0) {
+                println!("errored on: {}", line!());
+                return 0;
+            }
+
+            // PTE is valid :D
+            if (pte_r != 0) || (pte_x != 0) {
+                // step 5
+
+                let SUM = (mstatus & 0x40000) != 1; // permit Supervisor User Memory access
+                let MXR = (mstatus & 0x80000) != 1; // Make eXecutable Readable
+
+                // TODO
+                // MXR = 1 --> loads from either readable or executable will succeed
+                // MXR = 0 --> only loads from readable will succeed
+                // MXR has no effect if page based virtual memory is NOT in effect.
+
+                // SUM = 0 --> S-mode memory accesses to pages that are accessible by U-mode (U=1) will fault.
+                // SUM = 1 --> permitted
+
+                //step 6
+
+                let pte_ppn_2 = pte & 0x3FFFFFF0000000;
+                let pte_ppn_1 = pte & 0x0000000FF80000;
+                let pte_ppn_0 = pte & 0x0000000007FC00;
+                let pte_ppn = match i {
+                    0 => 0,
+                    1 => pte_ppn_0,
+                    2 => pte_ppn_0 | pte_ppn_1,
+                    3 => pte_ppn_0 | pte_ppn_1 | pte_ppn_2,
+                    _ => unreachable!(),
+                };
+
+
+                if i>0 && pte_ppn != 0 {
+                    // page fault
+                    println!("errored on: {}, misaligned superpage", line!());
+                    return 0;
+                }
+
+                // step 7
+                if pte_a == 0 || ((access_type == 1) && (pte_d == 0)) {
+                    println!("errored on: {}, page fault", line!());
+                    return 0;
+                }
+
+                // step 8
+                let mut pa : u64 = va & 0xfff; // set page offset
+                pa |= match i {
+                    0 => pte_ppn_0 | pte_ppn_1 | pte_ppn_2,
+                    1 => va_vpn[0] | pte_ppn_1 | pte_ppn_2,
+                    2 => va_vpn[0] | va_vpn[1] | pte_ppn_2,
+                    _ => unreachable!(),
+                };
+                return  pa;
+            }
+            i = i-1;
+            let pte_ppn = pte & 0x3FFFFFFFFFFC00;
+            a = pte_ppn*PAGESIZE;
+        }
+        // page fault
+        println!("errored on: {}", line!());
+        return 0;
+    } else {
+        return va;
+    }
 }
 
 fn load(mem: &mut Vec<u8>, func3: u8, address: u64) -> u64{
@@ -182,8 +326,8 @@ pub fn step(sim: &mut Simulator) {
                 rdi   = ((ir >>  7) & 0b11111) as u8;
             }
 
-            // I-type [JARL | LOAD | ADD+ | ADDIW
-            0b11001 | 0b00000 | 0b00100 | 0b00110 => { 
+            // I-type [JARL | LOAD | ADD+ | ADDIW | SYSTEM
+            0b11001 | 0b00000 | 0b00100 | 0b00110 | 0b11100 => { 
                 //rs1 = state.regs[(ir & 0x00f8000) as usize];
                 imm   =   ir >> 20;
                 rs1i  = ((ir >> 15) & 0b11111) as u8;
@@ -334,9 +478,46 @@ pub fn step(sim: &mut Simulator) {
             },
             0b00011 => {
                 // Fence
+
             },
-            0b111001 => {
-                // ECALL | EBREAK
+            0b11100 => {
+                let csr = &mut sim.csr;
+                let is_imm2 = func3 & 0b100 != 0;
+                if is_imm2 {rs1 = rs1i as u64;};
+
+                match func3 & 0b11 {
+                    0b00 => {
+                        // ECALL | EBREAK
+                        println!("ERROR! incorrect func3!, line: {}", line!());
+                    },
+                    //---------
+                    //- Zicsr -
+                    //---------
+                    0b01 => {
+                        // CSRRW(I)
+                        if rdi != 0 {
+                            rd = sim.csr[imm as usize]; //TODO zero extend
+                        }
+                        sim.csr[imm as usize] = rs1;
+                    },
+                    0b010 => {
+                        // CSRRS(I)
+                        rd = sim.csr[imm as usize]; //TODO zero extend
+                        if rs1i != 0 { // THIS ALSO CHECKS THE uimm AS PER THE SPEC
+                            sim.csr[imm as usize] |= rs1;
+                        }
+                        
+                    },
+                    0b011 => {
+                        // CSRRC(I)
+                        rd = sim.csr[imm as usize]; //TODO zero extend
+                        if rs1i != 0 {
+                            sim.csr[imm as usize] = sim.csr[imm as usize] & !rs1;
+                        }
+                    },
+                    _ => unreachable!(),
+                }
+
             },
 
             //---------
@@ -371,7 +552,7 @@ pub fn step(sim: &mut Simulator) {
                     }
                 }
             },
-            
+
             _ => {
                 sim.log = err;
                 println!("errored on: {}", line!());

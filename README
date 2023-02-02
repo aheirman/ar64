@@ -4,7 +4,15 @@ Aron's Risc-V64 sim
 
 https://twilco.github.io/riscv-from-scratch/2019/07/28/riscv-from-scratch-4.html
 
-riscv
+# TODO
+
+riscv-tests https://riscv.org/riscv-tests/
+device tree
+linux
+
+GPU
+
+# riscv
 https://msyksphinz-self.github.io/riscv-isadoc/html/rv64i.html
 https://msyksphinz-self.github.io/riscv-isadoc/html/rvi.html#addi
 
