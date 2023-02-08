@@ -2,6 +2,23 @@ AR64
 Aron's Risc-V64 sim
 
 
+# Open Tools
+
+## riscv_config
+https://riscv-config.readthedocs.io/en/stable/quickstart.html
+
+source .~/.profile
+`clear && riscv-config -ispec ar64_isa.yaml -pspec ar64_platform.yaml`
+
+## RISCOF
+https://riscof.readthedocs.io/en/stable/arch-tests.html
+
+
+`pip3 install git+https://github.com/riscv/riscof.git`
+
+riscof
+
+
 https://twilco.github.io/riscv-from-scratch/2019/07/28/riscv-from-scratch-4.html
 
 # TODO

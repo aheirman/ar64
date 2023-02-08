@@ -1,0 +1,1 @@
+clear && node sixel.js
