@@ -1,6 +1,7 @@
 <script>
 	export const prerender = false
 
+	import { onMount } from "svelte";
 
 	/* WASM
 	export let bindings;
@@ -16,7 +17,7 @@
 	// TCP
 	$: sim = {log: "", uart_out: "", sim_out: "", mem: [], states: [{last_instruction : "", pc : -1, last_pc : -1, regs : []}]}
 	const send_request = async (task) => {
-		const request = new Request('http://127.0.0.1:5173/api/ar64', {
+		const request = new Request('http://localhost:5173/api/ar64', {
             method: 'POST',
             body: JSON.stringify(task)+"\r\n"+"\r\n"
         });
@@ -93,10 +94,10 @@
 <body>	
 	<div class="vert">
 		<div class="options">
-			<button on:click={handle_image_load}>
-				load image
+			<button id="button_load" on:click={handle_image_load}>
+				load
 			</button>
-			<button on:click={handle_step}>
+			<button id="button_step" on:click={handle_step}>
 				step
 			</button>
 			<div class="log">
@@ -213,7 +214,7 @@
 
 	.uart {
 		background-color: whitesmoke;
-		width: 600px;
+		width: 200px;
 		border: 5px solid;
 		color: 404040;
 	}

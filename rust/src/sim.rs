@@ -61,8 +61,80 @@ pub fn default_sim() -> Simulator {
 
 #[derive(Copy, Clone)]
 pub enum CsrAddress {
-    SATP    = 0x180,
-    MSTATUS = 0x300,
+
+    // Supervisor Trap Setup
+    //SSTATUS   = 0x100,
+    //SIE       = 0x104,
+    //STVEC     = 0x105,
+    //SCONTEREN = 0x106,
+    
+    // Supervisor Configuration
+    //SENCVFG   = 0x10A,
+
+    // Supervisor Trap Handling
+    //SSCRATCH  = 0x140,
+    //SEPC      = 0x141,
+    //SCAUSE    = 0x142,
+    //STVAL     = 0x143,
+    //SIP       = 0x144,
+
+    // Supervisor Protection and Translation
+    SATP      = 0x180,
+
+    // Debut/Trace Registers
+
+    // Hypervisor *
+
+    // Machine Information Registers
+
+
+    //Machine Trap Setup
+    MSTATUS    = 0x300,
+    //MISA       = 0x301,
+    //MEDELEG    = 0x302, If AND ONLY IF S-mode exists
+    //MIDELEG    = 0x303, If AND ONLY IF S-mode exists
+    //MIE        = 0x304,
+    MTVEC      = 0x305, // WARL
+    //MCOUNTEREN = 0x306,
+
+    // Machine Trap Handling
+    //MSCRATCH = 0x340, // ignore?
+    MEPC     = 0x341, // WARL
+                      // Machine Exception Program Counter
+    MCAUSE   = 0x342, // WLRL
+    //MTVAL    = 0x343, // optional
+    //MIP      = 0x344,
+    //MTINST   = 0x34A, // Hypervisor
+    //MTVAL2   = 0x34B, // Hypervisor
+
+    // Machine Configuration
+
+    // Machine Memory Protection
+
+    // Machine Counter/Timers
+
+    // Machine Counter Setup
+
+    // Debug/Trace Registers
+
+    // Debug Mode Registers
+}
+
+fn handle_trap(pc : & mut u64, csr : & Vec<u64>) {
+    let mtvec : u64 = csr[CsrAddress::MTVEC as usize];
+    let mode  : u8  =(mtvec &  0b11) as u8;
+    let base  : u64 = mtvec & !0b11;
+
+    let cause : u64 = csr[CsrAddress::MCAUSE as usize] & 0x7FFFFFFFFFFFFFFF;
+
+    match mode {
+        // Direct
+        0 => {*pc = base;},
+        //Vectored
+        1 => {*pc = base + 4*cause;},
+        _ => {unreachable!();},
+    }
+
 }
 
 /*

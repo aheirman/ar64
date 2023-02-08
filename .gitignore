@@ -11,7 +11,8 @@ rust/target
 *.pdf
 *.lock
 
-
+sixel/.cache/
+sixel/package-lock.json
 
 
 
