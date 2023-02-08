@@ -14,7 +14,8 @@ rust/target
 sixel/.cache/
 sixel/package-lock.json
 
-
+open_tools
+tests/riscv-tests/
 
 .DS_Store
 node_modules
