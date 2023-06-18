@@ -115,7 +115,7 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
                 }
                 "load image" => {
                     println!("load image");
-                    let res = &fs::read("/home/iame/Desktop/programming/non-school/ar64/image");
+                    //let res = &fs::read("/home/iame/Desktop/programming/non-school/ar64/image");
                     /*
                     let mut sim = &mut simulators.get_mut(&simulator_key);
                     match res {

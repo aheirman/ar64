@@ -7,60 +7,59 @@ use std::{panic, fs};
 
 use serde::{Serialize, Deserialize};
 
-#[derive(Copy, Clone)]
-pub enum CsrAddress {
+mod CsrAddress {
 
     // Supervisor Trap Setup
-    SSTATUS    = 0x100, 
-    SIE        = 0x104, // interrupt-enable register
-    STVEC      = 0x105, // trap handler base address
-    SCONTEREN  = 0x106, // counter enable
+    pub const SSTATUS    : usize = 0x100; 
+    pub const SIE        : usize = 0x104; // interrupt-enable register
+    pub const STVEC      : usize = 0x105; // trap handler base address
+    pub const SCONTEREN  : usize = 0x106; // counter enable
     
     // Supervisor Configuration
-    SENCVFG    = 0x10A, // environment configuration register
+    pub const SENCVFG    : usize = 0x10A; // environment configuration register
 
     // Supervisor Trap Handling
-    SSCRATCH   = 0x140, // scratch reg for supervisor trap handlers
-    SEPC       = 0x141, // Exception program counter
-    SCAUSE     = 0x142, // trap cause
-    STVAL      = 0x143, // bad address or instruction
-    SIP        = 0x144, // interrupt pending
+    pub const SSCRATCH   : usize = 0x140; // scratch reg for supervisor trap handlers
+    pub const SEPC       : usize = 0x141; // Exception program counter
+    pub const SCAUSE     : usize = 0x142; // trap cause
+    pub const STVAL      : usize = 0x143; // bad address or instruction
+    pub const SIP        : usize = 0x144; // interrupt pending
 
     // Supervisor Protection and Translation
-    SATP       = 0x180, // Address Translation and Protection
+    pub const SATP       : usize = 0x180; // Address Translation and Protection
 
     // Debut/Trace Registers
-    SCONTEXT   = 0x5A8, // 
+    pub const SCONTEXT   : usize = 0x5A8; // 
     // Hypervisor *
 
     // Machine Information Registers
-    //MVENDORID  = 0xF11, // vendor ID
-    //MARCHID    = 0xF12, // arch ID
-    //MIMPID     = 0xF13, // implementation ID
-    MHARTID    = 0xF14,
-    // MCONFIGPTR = 0xF15, // physical address of config ptr, not yet standardized!
+    //pub const MVENDORID : usize = 0xF11; // vendor ID
+    //pub const MARCHID   : usize = 0xF12; // arch ID
+    //pub const MIMPID    : usize = 0xF13; // implementation ID
+    pub const MHARTID    : usize = 0xF14;
+    //pub const MCONFIGPTR = 0xF15; // physical address of config ptr, not yet standardized!
 
     //Machine Trap Setup
-    MSTATUS    = 0x300, // HART operating state
-    MISA       = 0x301, // WARL, ISA and extensions
-    MEDELEG    = 0x302, // WARL, exception delegation reg, If AND ONLY IF S-mode exists
-    MIDELEG    = 0x303, // WARL, interrupt delegation reg, If AND ONLY IF S-mode exists
-    MIE        = 0x304, // WARL, interrupt enable
-    MTVEC      = 0x305, // WARL, trap handler base address reg
-    MCOUNTEREN = 0x306, // counter enable
+    pub const MSTATUS    : usize = 0x300; // HART operating state
+    pub const MISA       : usize = 0x301; // WARL, ISA and extensions
+    pub const MEDELEG    : usize = 0x302; // WARL, exception delegation reg, If AND ONLY IF S-mode exists
+    pub const MIDELEG    : usize = 0x303; // WARL, interrupt delegation reg, If AND ONLY IF S-mode exists
+    pub const MIE        : usize = 0x304; // WARL, interrupt enable
+    pub const MTVEC      : usize = 0x305; // WARL, trap handler base address reg
+    pub const MCOUNTEREN : usize = 0x306; // counter enable
 
     // Machine Trap Handling
-    MSCRATCH   = 0x340, // register for trap handler
-    MEPC       = 0x341, // WARL, machine exception program counter
-    MCAUSE     = 0x342, // WLRL, trap cause
-    //MTVAL    = 0x343, // WARL, bad address or instruction, optional
-    MIP        = 0x344, // WARL, interrupt pending
-    //MTINST   = 0x34A, // Hypervisor
-    //MTVAL2   = 0x34B, // Hypervisor
+    pub const MSCRATCH  : usize = 0x340; // register for trap handler
+    pub const MEPC      : usize = 0x341; // WARL; machine exception program counter
+    pub const MCAUSE    : usize = 0x342; // WLRL; trap cause
+    //pub const MTVAL   : usize = 0x343; // WARL; bad address or instruction; optional
+    pub const MIP       : usize = 0x344; // WARL; interrupt pending
+    // pub const MTINST : usize = 0x34A; // Hypervisor
+    // pub const MTVAL2 : usize = 0x34B; // Hypervisor
 
     // Machine Configuration
-    MENVCFG    = 0x30A, // environment configuration register
-    // MSECCFG    = 0x747, // security configuration reg
+    pub const MENVCFG   : usize = 0x30A; // environment configuration register
+    //pub const  MSECCFG    = 0x747; // security configuration reg
 
     // Machine Memory Protection
 
@@ -120,7 +119,8 @@ pub fn default_cpu_state() -> CpuState {
             regs: vec![0; 32],
             pc:   0,
             last_pc : 0,
-            last_instruction : String::from("")
+            last_instruction : String::from(""),
+            current_mode : 0b11,
         };
 }
 
@@ -128,7 +128,7 @@ fn default_csr() -> Vec<u64> {
     let mut csr = vec![0;4096];
 
     // 64 bit, BV64I, S, U
-    csr[CsrAddress::MISA] = 0b10 << 62 | 1 << 8 | 1 << 18 | 1 << 20;
+    csr[CsrAddress::MISA ] = 0b10 << 62 | 1 << 8 | 1 << 18 | 1 << 20;
     return csr;
 }
 
@@ -141,7 +141,7 @@ pub fn default_sim() -> Simulator {
         states: states,
         // fill mem with NOP
         mem: vec![0; 8192],
-        csr: ,
+        csr: default_csr(),
         log: String::from("OK"),
         sim_out: String::from(""),
         uart_out: vec![],
@@ -155,39 +155,15 @@ pub fn default_sim() -> Simulator {
 
 
 
-/*
- * There exists 4 kinds of traps
- *
- * 1) contained:  trap is visible to and handled by software running inside the execution environment
- * 2) Requested:  trap is synchronous exception that is an explicit call to the execution environment
- * 3) Invisible:  Trap is handled transparantly by the execution environment and execution resumes normally after trap is handled
- * 4) Fatal trap: Causes the execution environment to terminate execution
- *
- * By default all traps, at any priveledge level, are handled in machine mode. 
- * These can be redirected with MRET to the appropriate level.
- * Alternatively, with MEDELEG and MIDELEG can delegate the trap to the S-mode trap handler, 
- *  when this occurs, the delegated inturrupts are masked at the delegator level.
- * 
- * When a trap is taken into M-mode, MEPC is written with the virtual address of the instruction that was interrupted or that encountered the exception.
- * When a trap is taken into M-mode, MCAUSE is written with a code indicating the event that caused the trap.
- *
- */
-fn catch_trap(pc : & mut u64, csr : & Vec<u64>) {
-    let mtvec : u64 = csr[CsrAddress::MTVEC as usize];
-    let mtvec_mode  : u8  =(mtvec &  0b11) as u8;
-    let mtvec_base  : u64 = mtvec & !0b11;
 
-    let mcause_exepction_code : u64 = csr[CsrAddress::MCAUSE as usize] & 0x7FFFFFFFFFFFFFFF;
+fn catch_trap(pc : & mut u64, csr : & Vec<u64>) {
+
+
+    //let mcause_exepction_code : u64 = csr[CsrAddress::MCAUSE ] & 0x7FFFFFFFFFFFFFFF;
 
     //TODO: handle MEDELEG & MIDELEG
 
-    match mtvec_mode {
-        // Direct
-        0 => {*pc = mtvec_base;},
-        //Vectored
-        1 => {*pc = mtvec_base + 4*cause;},
-        _ => {unreachable!();},
-    }
+
 
 }
 
@@ -220,8 +196,8 @@ fn translate_address(csr : Vec<u64>, mem : Vec<u8>, va : u64, access_type : u8) 
 
 
     // Supervisor Address Translation and Protection register
-    let satp    = csr[CsrAddress::SATP    as usize];
-    let mstatus = csr[CsrAddress::MSTATUS as usize];
+    let satp    = csr[CsrAddress::SATP    ];
+    let mstatus = csr[CsrAddress::MSTATUS ];
 
     // physical page number
     let satp_ppn   = satp & 0xfffffffffff; // bottom 44 bits
@@ -399,8 +375,6 @@ fn store(mem: &mut Vec<u8>, func3: u8, address: u64, rs2: u64, uart_out: &mut Ve
     }
 }
 
-fn decode(ir: u32) -> ()) {}
-
 pub fn step(sim: &mut Simulator) {
     let states = &mut sim.states;
 
@@ -411,7 +385,9 @@ pub fn step(sim: &mut Simulator) {
         let mut state = &mut states[i];
         
         // fetch
-        let mut pc = state.pc;
+        let pc = state.pc;
+        let mut npc: Option<u64> = None; // new pc
+
         state.last_pc = pc;
         let ir: u32 = u32::from_le_bytes(sim.mem[pc as usize .. (pc + 4) as usize ].try_into().unwrap());
         
@@ -526,28 +502,28 @@ pub fn step(sim: &mut Simulator) {
                 if imm & 0x00100000 != 0 {imm |= 0xffe00000; }
                 rd  = pc  + 4;
                 println!("JAL: imm: {}", imm as i64);
-                pc += imm as i32 as i64 as u64 - 4;
+                npc = Some(pc + imm as i32 as i64 as u64);
                 //TODO: gen instruction-address-misaligned exception if the target address is not aligned to a four-byte boundary.
             }, 
             0b11001 => { // JALR: Jump and link indirect
                 if imm & 0x0000800 != 0 {imm |= 0xffffe000; }
                 rd = pc + 4;
-                pc = ( (rs1 + imm as i64 as u64) & !1)   - 4;
+                npc = Some( (rs1 + imm as i64 as u64) & !1);
                 //TODO: gen instruction-address-misaligned exception if the target address is not aligned to a four-byte boundary.
             }, 
             0b11000 => { // BEQ
                 if imm & 0x1000 != 0 {imm |= 0xffffe000; }
-                let addr = pc + imm as i64 as u64 -4;
+                let addr = pc + imm as i64 as u64;
 
                 // BEQ BNE BLT BGE BLTU BGEU
                 println!("BEQ+: r{:}:{:} op r{:}:{:}; addr: {:X}={:X}+{}-4", rs1i, rs1, rs2i, rs2, addr, pc, imm);
                 match func3 {
-                    0b000 => { if  rs1 == rs2 {pc = addr;} }
-                    0b001 => { if  rs1 != rs2 {pc = addr;} }
-                    0b100 => { if (rs1 as i64) <  (rs2 as i64) {pc = addr;} }
-                    0b101 => { if (rs1 as i64) >= (rs2 as i64) {pc = addr;} }
-                    0b110 => { if (rs1 as u64) <  (rs2 as u64) {pc = addr;} }
-                    0b111 => { if (rs1 as u64) >= (rs2 as u64) {pc = addr;} }
+                    0b000 => { if  rs1 == rs2 {npc = Some(addr);} }
+                    0b001 => { if  rs1 != rs2 {npc = Some(addr);} }
+                    0b100 => { if (rs1 as i64) <  (rs2 as i64) {npc = Some(addr);} }
+                    0b101 => { if (rs1 as i64) >= (rs2 as i64) {npc = Some(addr);} }
+                    0b110 => { if (rs1 as u64) <  (rs2 as u64) {npc = Some(addr);} }
+                    0b111 => { if (rs1 as u64) >= (rs2 as u64) {npc = Some(addr);} }
                     _     => {trap = 1;println!("errored on: {}", line!());}
                 }
             },
@@ -617,6 +593,7 @@ pub fn step(sim: &mut Simulator) {
 
                 match func3 & 0b11 {
                     0b00 => { 
+                        // p21
                         if        imm == 0b000000000000 { // ECALL
                             // ECALL | EBREAK
                             // cause a precise trap to the supporting execution environment
@@ -626,6 +603,37 @@ pub fn step(sim: &mut Simulator) {
                             // xPP holds the previous priviledge mode
                             // MPP is 2 bits wide
                             // SPP is 1 bit wide
+
+                            /*
+                             * There exists 4 kinds of traps
+                             *
+                             * 1) contained:  trap is visible to and handled by software running inside the execution environment
+                             * 2) Requested:  trap is synchronous exception that is an explicit call to the execution environment
+                             * 3) Invisible:  Trap is handled transparantly by the execution environment and execution resumes normally after trap is handled
+                             * 4) Fatal trap: Causes the execution environment to terminate execution
+                             *
+                             * By default all traps, at any priveledge level, are handled in machine mode. 
+                             * These can be redirected with MRET to the appropriate level.
+                             * Alternatively, with MEDELEG and MIDELEG can delegate the trap to the S-mode trap handler, 
+                             *  when this occurs, the delegated inturrupts are masked at the delegator level.
+                             * 
+                             * When a trap is taken into M-mode, MEPC is written with the virtual address of the instruction that was interrupted or that encountered the exception.
+                             * When a trap is taken into M-mode, MCAUSE is written with a code indicating the event that caused the trap.
+                             *
+                             */
+
+                            let mtvec : u64 = csr[CsrAddress::MTVEC ];
+                            let mtvec_mode  : u8  =(mtvec &  0b11) as u8;
+                            let mtvec_base  : u64 = mtvec & !0b11;
+                            let cause = 0; // TOOD
+                            
+                            match mtvec_mode {
+                                // Direct
+                                0 => {npc = Some(mtvec_base);},
+                                //Vectored
+                                1 => {npc = Some(mtvec_base + 4*cause);},
+                                _ => {unreachable!();},
+                            }
 
 
                             println!("ERROR! unimplemented, line: {}", line!());
@@ -639,10 +647,12 @@ pub fn step(sim: &mut Simulator) {
                         else if imm == 0b000100000010 { // SRET
 
                             // TODO: raise illegal instruction exception when TSR=1 in mstatus
-                            pc = csr[CsrAddress::SEPC];
+                            
+                            npc = Some(csr[CsrAddress::SEPC ]);
                             println!("ERROR! unimplemented, line: {}", line!());
                         } else if imm == 0b001100000010 { // MRET
-                            pc = csr[CsrAddress::MEPC];
+                            
+                            npc = Some(csr[CsrAddress::MEPC ]);
                             println!("ERROR! unimplemented, line: {}", line!());
                         } else{
                             println!("ERROR! incorrect func3!, line: {}", line!());
@@ -726,7 +736,13 @@ pub fn step(sim: &mut Simulator) {
         if rdi != 0 {
             state.regs[rdi as usize] = rd;
         }
-        state.pc = pc + 4; 
+
+
+        state.pc = match npc {
+            Some(x) => x,
+            None    => pc + 4
+        };
+         
         sim.log = rd.to_string();//String::from("OK");
     }
     
