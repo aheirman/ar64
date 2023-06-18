@@ -3,7 +3,7 @@
 other/
 image*
 
-rust/target
+sim/target
 
 
 *.elf

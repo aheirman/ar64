@@ -7,6 +7,73 @@ use std::{panic, fs};
 
 use serde::{Serialize, Deserialize};
 
+#[derive(Copy, Clone)]
+pub enum CsrAddress {
+
+    // Supervisor Trap Setup
+    SSTATUS    = 0x100, 
+    SIE        = 0x104, // interrupt-enable register
+    STVEC      = 0x105, // trap handler base address
+    SCONTEREN  = 0x106, // counter enable
+    
+    // Supervisor Configuration
+    SENCVFG    = 0x10A, // environment configuration register
+
+    // Supervisor Trap Handling
+    SSCRATCH   = 0x140, // scratch reg for supervisor trap handlers
+    SEPC       = 0x141, // Exception program counter
+    SCAUSE     = 0x142, // trap cause
+    STVAL      = 0x143, // bad address or instruction
+    SIP        = 0x144, // interrupt pending
+
+    // Supervisor Protection and Translation
+    SATP       = 0x180, // Address Translation and Protection
+
+    // Debut/Trace Registers
+    SCONTEXT   = 0x5A8, // 
+    // Hypervisor *
+
+    // Machine Information Registers
+    //MVENDORID  = 0xF11, // vendor ID
+    //MARCHID    = 0xF12, // arch ID
+    //MIMPID     = 0xF13, // implementation ID
+    MHARTID    = 0xF14,
+    // MCONFIGPTR = 0xF15, // physical address of config ptr, not yet standardized!
+
+    //Machine Trap Setup
+    MSTATUS    = 0x300, // HART operating state
+    MISA       = 0x301, // WARL, ISA and extensions
+    MEDELEG    = 0x302, // WARL, exception delegation reg, If AND ONLY IF S-mode exists
+    MIDELEG    = 0x303, // WARL, interrupt delegation reg, If AND ONLY IF S-mode exists
+    MIE        = 0x304, // WARL, interrupt enable
+    MTVEC      = 0x305, // WARL, trap handler base address reg
+    MCOUNTEREN = 0x306, // counter enable
+
+    // Machine Trap Handling
+    MSCRATCH   = 0x340, // register for trap handler
+    MEPC       = 0x341, // WARL, machine exception program counter
+    MCAUSE     = 0x342, // WLRL, trap cause
+    //MTVAL    = 0x343, // WARL, bad address or instruction, optional
+    MIP        = 0x344, // WARL, interrupt pending
+    //MTINST   = 0x34A, // Hypervisor
+    //MTVAL2   = 0x34B, // Hypervisor
+
+    // Machine Configuration
+    MENVCFG    = 0x30A, // environment configuration register
+    // MSECCFG    = 0x747, // security configuration reg
+
+    // Machine Memory Protection
+
+    // Machine Counter/Timers
+
+    // Machine Counter Setup
+
+    // Debug/Trace Registers
+
+    // Debug Mode Registers
+}
+
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Simulator {
     pub states:   Vec<CpuState>,
@@ -21,13 +88,28 @@ pub struct Simulator {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct CpuState {
-    // regs[0] MUST be zero
-    // regs[1] convention return address
-    // regs[5] alternate link register
+    // x0: Zero
+    // x1 - ra: Return address
+    // x2 - sp: Stack pointer
+    // x3 - gp: Global pointer
+    // x4 - tp: Thread pointer
+    // x5-7   - t0-2:  Tmp regs
+    // x8-9   - s0-1:  Vallee-saved regs
+    // x10-17 - a0-7:  Argument regs
+    // x18-27 - s2-11: Callee-saved regs
+    // x28-31 - t3-6:  Tmp regs.
     pub regs : Vec<u64>, 
     pub pc   : u64,
     pub last_pc : u64,
     pub last_instruction : String,
+    /*
+     * encoding:
+     *      00: U
+     *      01: S
+     *      10: RESERVED
+     *      11: M
+     */
+    pub current_mode : u8,
 
      
 }
@@ -42,6 +124,14 @@ pub fn default_cpu_state() -> CpuState {
         };
 }
 
+fn default_csr() -> Vec<u64> {
+    let mut csr = vec![0;4096];
+
+    // 64 bit, BV64I, S, U
+    csr[CsrAddress::MISA] = 0b10 << 62 | 1 << 8 | 1 << 18 | 1 << 20;
+    return csr;
+}
+
 pub fn default_sim() -> Simulator {
     let mut states = Vec::new();
     for i in 0..1 {
@@ -51,7 +141,7 @@ pub fn default_sim() -> Simulator {
         states: states,
         // fill mem with NOP
         mem: vec![0; 8192],
-        csr: vec![0;4096],
+        csr: ,
         log: String::from("OK"),
         sim_out: String::from(""),
         uart_out: vec![],
@@ -59,79 +149,43 @@ pub fn default_sim() -> Simulator {
     };
 }
 
-#[derive(Copy, Clone)]
-pub enum CsrAddress {
-
-    // Supervisor Trap Setup
-    //SSTATUS   = 0x100,
-    //SIE       = 0x104,
-    //STVEC     = 0x105,
-    //SCONTEREN = 0x106,
-    
-    // Supervisor Configuration
-    //SENCVFG   = 0x10A,
-
-    // Supervisor Trap Handling
-    //SSCRATCH  = 0x140,
-    //SEPC      = 0x141,
-    //SCAUSE    = 0x142,
-    //STVAL     = 0x143,
-    //SIP       = 0x144,
-
-    // Supervisor Protection and Translation
-    SATP      = 0x180,
-
-    // Debut/Trace Registers
-
-    // Hypervisor *
-
-    // Machine Information Registers
+// WPRI -- Reserved:  Writes Preserve Values, Reads Ignore Values
+// WLRL -- Write legal, Read legal
+// WARL -- Write Any value, Read Legal Values 
 
 
-    //Machine Trap Setup
-    MSTATUS    = 0x300,
-    //MISA       = 0x301,
-    //MEDELEG    = 0x302, If AND ONLY IF S-mode exists
-    //MIDELEG    = 0x303, If AND ONLY IF S-mode exists
-    //MIE        = 0x304,
-    MTVEC      = 0x305, // WARL
-    //MCOUNTEREN = 0x306,
 
-    // Machine Trap Handling
-    //MSCRATCH = 0x340, // ignore?
-    MEPC     = 0x341, // WARL
-                      // Machine Exception Program Counter
-    MCAUSE   = 0x342, // WLRL
-    //MTVAL    = 0x343, // optional
-    //MIP      = 0x344,
-    //MTINST   = 0x34A, // Hypervisor
-    //MTVAL2   = 0x34B, // Hypervisor
-
-    // Machine Configuration
-
-    // Machine Memory Protection
-
-    // Machine Counter/Timers
-
-    // Machine Counter Setup
-
-    // Debug/Trace Registers
-
-    // Debug Mode Registers
-}
-
-fn handle_trap(pc : & mut u64, csr : & Vec<u64>) {
+/*
+ * There exists 4 kinds of traps
+ *
+ * 1) contained:  trap is visible to and handled by software running inside the execution environment
+ * 2) Requested:  trap is synchronous exception that is an explicit call to the execution environment
+ * 3) Invisible:  Trap is handled transparantly by the execution environment and execution resumes normally after trap is handled
+ * 4) Fatal trap: Causes the execution environment to terminate execution
+ *
+ * By default all traps, at any priveledge level, are handled in machine mode. 
+ * These can be redirected with MRET to the appropriate level.
+ * Alternatively, with MEDELEG and MIDELEG can delegate the trap to the S-mode trap handler, 
+ *  when this occurs, the delegated inturrupts are masked at the delegator level.
+ * 
+ * When a trap is taken into M-mode, MEPC is written with the virtual address of the instruction that was interrupted or that encountered the exception.
+ * When a trap is taken into M-mode, MCAUSE is written with a code indicating the event that caused the trap.
+ *
+ */
+fn catch_trap(pc : & mut u64, csr : & Vec<u64>) {
     let mtvec : u64 = csr[CsrAddress::MTVEC as usize];
-    let mode  : u8  =(mtvec &  0b11) as u8;
-    let base  : u64 = mtvec & !0b11;
+    let mtvec_mode  : u8  =(mtvec &  0b11) as u8;
+    let mtvec_base  : u64 = mtvec & !0b11;
 
-    let cause : u64 = csr[CsrAddress::MCAUSE as usize] & 0x7FFFFFFFFFFFFFFF;
+    let mcause_exepction_code : u64 = csr[CsrAddress::MCAUSE as usize] & 0x7FFFFFFFFFFFFFFF;
 
-    match mode {
+    //TODO: handle MEDELEG & MIDELEG
+
+    match mtvec_mode {
         // Direct
-        0 => {*pc = base;},
+        0 => {*pc = mtvec_base;},
         //Vectored
-        1 => {*pc = base + 4*cause;},
+        1 => {*pc = mtvec_base + 4*cause;},
         _ => {unreachable!();},
     }
 
@@ -344,13 +398,16 @@ fn store(mem: &mut Vec<u8>, func3: u8, address: u64, rs2: u64, uart_out: &mut Ve
         //sim.state = false;
     }
 }
+
+fn decode(ir: u32) -> ()) {}
+
 pub fn step(sim: &mut Simulator) {
     let states = &mut sim.states;
 
 
 
 
-    for i in 0..states.len(){
+    for i in 0..states.len(){ // step all HARTs
         let mut state = &mut states[i];
         
         // fetch
@@ -387,6 +444,7 @@ pub fn step(sim: &mut Simulator) {
             return
         }
 
+        // decode 
         match opcode {
             
             // R-type
@@ -552,15 +610,46 @@ pub fn step(sim: &mut Simulator) {
                 // Fence
 
             },
-            0b11100 => {
+            0b11100 => { // SYSTEM
                 let csr = &mut sim.csr;
                 let is_imm2 = func3 & 0b100 != 0;
                 if is_imm2 {rs1 = rs1i as u64;};
 
                 match func3 & 0b11 {
-                    0b00 => {
-                        // ECALL | EBREAK
-                        println!("ERROR! incorrect func3!, line: {}", line!());
+                    0b00 => { 
+                        if        imm == 0b000000000000 { // ECALL
+                            // ECALL | EBREAK
+                            // cause a precise trap to the supporting execution environment
+                            // set epc register for the recieving privilidge mode to the address of the ECALL and EBREAK instructions themselves
+                            
+                            // set xPIE: holds the value of the interrupt-enable bit active prior to the trap
+                            // xPP holds the previous priviledge mode
+                            // MPP is 2 bits wide
+                            // SPP is 1 bit wide
+
+
+                            println!("ERROR! unimplemented, line: {}", line!());
+                        } else if imm == 0b000000000001 { // EBREAK
+
+                            println!("ERROR! unimplemented, line: {}", line!());
+                        } 
+                        
+                        // TODO: pop the relevant lower-privilege interrupt enable and privilege mode stack
+                        // TODO: An xRET instruction can be executed in privilege mode x or higher,
+                        else if imm == 0b000100000010 { // SRET
+
+                            // TODO: raise illegal instruction exception when TSR=1 in mstatus
+                            pc = csr[CsrAddress::SEPC];
+                            println!("ERROR! unimplemented, line: {}", line!());
+                        } else if imm == 0b001100000010 { // MRET
+                            pc = csr[CsrAddress::MEPC];
+                            println!("ERROR! unimplemented, line: {}", line!());
+                        } else{
+                            println!("ERROR! incorrect func3!, line: {}", line!());
+                        }
+                        // set cause
+                        // set pc
+                        
                     },
                     //---------
                     //- Zicsr -
@@ -591,6 +680,7 @@ pub fn step(sim: &mut Simulator) {
                 }
 
             },
+
 
             //---------
             //- RV64i -
