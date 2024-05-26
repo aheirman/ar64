@@ -108,7 +108,7 @@ pub struct CpuState {
      *      10: RESERVED
      *      11: M
      */
-    pub current_mode : u8,
+    pub priviledge_mode : u8,
 
      
 }
@@ -120,7 +120,7 @@ pub fn default_cpu_state() -> CpuState {
             pc:   0,
             last_pc : 0,
             last_instruction : String::from(""),
-            current_mode : 0b11,
+            priviledge_mode : 0b11,
         };
 }
 
@@ -134,13 +134,13 @@ fn default_csr() -> Vec<u64> {
 
 pub fn default_sim() -> Simulator {
     let mut states = Vec::new();
-    for i in 0..1 {
+    for i in 0..2 {
         states.push(default_cpu_state());
     }
     return Simulator{
         states: states,
         // fill mem with NOP
-        mem: vec![0; 8192],
+        mem: vec![0; 256],
         csr: default_csr(),
         log: String::from("OK"),
         sim_out: String::from(""),
@@ -334,7 +334,7 @@ fn load(mem: &mut Vec<u8>, func3: u8, address: u64) -> u64{
 }
 
 fn store(mem: &mut Vec<u8>, func3: u8, address: u64, rs2: u64, uart_out: &mut Vec<u8>){
-    if address < 0x1000 {
+    if address < mem.len() as u64 {
         match func3 {
             0b000 => { 
                 mem[address as usize] = rs2 as u8;
@@ -364,10 +364,10 @@ fn store(mem: &mut Vec<u8>, func3: u8, address: u64, rs2: u64, uart_out: &mut Ve
                 println!("errored on: {}", line!());
             },
         }
-    } else if address == 0x10000000 {
+    } else if address == 0x1000007 {
         // UART
         uart_out.push(rs2 as u8)
-    } else if address <= 0x1000007 {
+    } else if (0x10000000..0x1000007).contains(&address)  {
         println!("WARN on: {}, WRITING UART STATUS REGISTERS IS NOT SUPPORTED, address: {:X}, value: {:X}", line!(), address, rs2);
     } else {
         println!("errored on: {}, address: {:X}", line!(), address);
@@ -627,6 +627,21 @@ pub fn step(sim: &mut Simulator) {
                             let mtvec_base  : u64 = mtvec & !0b11;
                             let cause = 0; // TOOD
                             
+                            csr[CsrAddress::MEPC]   = pc & !0b11; // IALIGN is 32 bit
+
+                            /*
+                             *      00: U
+                             *      01: S
+                             *      10: RESERVED
+                             *      11: M
+                             */
+                            csr[CsrAddress::MCAUSE] = match state.priviledge_mode {
+                                0b00 => 8,
+                                0b01 => 9,
+                                0b11 => 11,
+                                _ => {unreachable!();},
+                            };
+
                             match mtvec_mode {
                                 // Direct
                                 0 => {npc = Some(mtvec_base);},

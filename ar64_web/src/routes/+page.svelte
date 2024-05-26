@@ -1,6 +1,4 @@
 <script>
-	export const prerender = false
-
 	import { onMount } from "svelte";
 
 	/* WASM
@@ -15,60 +13,77 @@
 	*/
 
 	// TCP
-	$: sim = {log: "", uart_out: "", sim_out: "", mem: [], states: [{last_instruction : "", pc : -1, last_pc : -1, regs : []}]}
+	$: sim = {log: "", uart_out: "", sim_out: "", mem: [], states: [{last_instruction : "", pc : -1, last_pc : -1, regs : []}, {last_instruction : "", pc : -1, last_pc : -1, regs : []}]}
+
+
 	const send_request = async (task) => {
 		const request = new Request('http://localhost:5173/api/ar64', {
             method: 'POST',
             body: JSON.stringify(task)+"\r\n"+"\r\n"
         });
-        return await fetch(request)
+		
+        return fetch(request)
             .then(function (response) {
-                if (response.status == 200) {
+                console.log("response: " + response.status)
+				if (response.status == 200) {
                     return response.blob();
                 }
                 throw response.status;
             })
             .then(blob => blob.text())
-			.then(txt => JSON.parse(txt))
-            .then(function(response) {
-				//
-                // do something with the data sent in the request
-                //console.log("page: got a response'" + response + "'")
-                if (response["error"] != undefined) {
-                    console.log('page: ' + response["error"])
-                } else {
-                    status = 'OK'
-					//console.log(response)
-					return response;
-                }
-            })
+			.then(txt => {
+					console.log("response txt: " + txt)
+					let o = JSON.parse(txt)
+					console.log("response json: " + o.simulator_key)
+					status = "OK"
+					return o
+				}
+			)
             .catch(function (response) {
                 console.log('page error: ', response)
                 status = 'Server error'
-            });
-			return sim;
+        
+			});
+		
+		//return sim;
+		
+		/*
+		return await fetch(request)
+			.then((response) => {
+					console.log("aaa" + response)
+					let my_json = response.json()
+					console.log("bbb" + my_json)
+					my_json
+			})
+			.then((response) => {
+					console.log(response)
+				}
+			)*/
 	}
 	const handle_step = async () => {
         const task = {"action": "step"};
-		sim = await send_request(task);
-
+		let res = await send_request(task);
+		sim = res.sim
 	};
 	const handle_image_load = async () => {
         const task = {"action": "load image"};
-		sim = await send_request(task);
+		let res = await send_request(task);
+		sim = res.sim
 	};
 	const get_default_simulator = async () => {
         const task = {"action": "init"};
-		sim = await send_request(task);
+		let res = await send_request(task);
+		sim = res.sim
+		console.log('get_default_simulator: ' +sim)
 	};
 
-	let str = get_default_simulator();
+	get_default_simulator();
 	
 	// Agnostic
 	let status = "NO CONNECTION!"
 	
 	$: log  = sim.log;
-	$: uart_out = String.fromCharCode(...sim.uart_out);
+	$: uart_out = ""//String.fromCharCode(...sim.uart_out);
 	$: sim_out = sim.sim_out;
 	$: mem2D = gen2Dmem(sim);
 
@@ -220,3 +235,4 @@
 	}
 
 </style>
+sim

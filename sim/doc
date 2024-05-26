@@ -6,3 +6,9 @@ Intentional spec disregards
 
 Intentional spec regards
 1) unaligned loads and stores
+
+
+https://jborza.com/emulation/2021/04/22/ecalls-and-syscalls.html
+
+https://github.com/riscv-software-src/opensbi
+https://osblog.stephenmarz.com/index.html

@@ -56,7 +56,7 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
     let buf_reader = BufReader::new(&mut stream);
     let mut first = true;
 
-    println!("[handle_connection]");
+    //println!("[handle_connection]");
     let http_request: Vec<_> = buf_reader
         .lines()
         .map(|result| result.unwrap())
@@ -76,7 +76,6 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
         let mut body: serde_json::Value = serde_json::from_str(str_body).unwrap();
 
 
-        let contents = String::from("");
         let mut debug = match body.get_mut("debug"){
             Some(debug_text) => {
                 println!("[handle_connection] debug_text: {:#?}", debug_text);
@@ -87,22 +86,23 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
 
         let simulator_key = match body.get_mut("device_index"){
             Some(device_index) => {
-                println!("[handle_connection] device_index: {:#?}", device_index);
                 let index: i32 = device_index.to_string().parse::<i32>().unwrap();
-                if !simulators.contains_key(&index){
-                    println!("[handle_connection - ERROR] device_index: {:#?} is not in map", device_index);
-                }
                 index
             }
             _ => 0
         };
+        if !simulators.contains_key(&simulator_key){
+            println!("[handle_connection - WARN] device_index: {:#?} is not in map", simulator_key);
+        }
+
+        println!("[handle_connection] device_index: {:#?}", simulator_key);
         let possible_sim = &mut simulators.get_mut(&simulator_key);
 
         if let Some(action) = body.get_mut("action").unwrap().as_str() {
         
             match action {
                 "init" => {
-                    println!("INIT");
+                    println!("INIT at {:}", next_index);
                     simulators.insert(*next_index, default_sim());
                 }
                 "step" => {
@@ -115,9 +115,9 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
                 }
                 "load image" => {
                     println!("load image");
-                    //let res = &fs::read("/home/iame/Desktop/programming/non-school/ar64/image");
-                    /*
-                    let mut sim = &mut simulators.get_mut(&simulator_key);
+                    let res = &fs::read("/home/iame/Desktop/programming/non-school/ar64/image");
+                    
+                    let mut sim = &mut simulators.get_mut(&simulator_key).unwrap();
                     match res {
                         Err(e) => {sim.log =  String::from(format!("ERRROR: failed to load image! {:?}", e))},
                         Ok(file) => {
@@ -131,7 +131,7 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
 
 
                         },
-                    }*/
+                    }
                     
                     
                 }
@@ -145,10 +145,10 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
             debug = false;
         }
 
-
-        if debug {
-            //let mut sim = &mut simulators.get_mut(&simulator_key);
-            //contents += &serde_json::to_string(&sim).unwrap();
+        let mut contents = String::from("");
+        if true {
+            let sim = &mut simulators.get_mut(&simulator_key).unwrap();
+            contents += &*serde_json::to_string(&sim).unwrap();
         }
         let length = contents.len();
     
@@ -159,11 +159,17 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
 
 
         let response = format!(
-            "{status_line}\r\nsimulator_key: {simulator_key}\r\nContent-Length: {length}\r\n\r\n{contents}"
+            "{status_line}\r\n
+            {{
+                \"simulator_key\": {simulator_key},\r\n
+                \"sim\": {contents},\r\n
+                \"Content-Length\": {length}\r\n
+            }} 
+            \r\n"
         );
 
 
-        println!("[handle_connection] response: {:#?}", response);
+        //println!("[handle_connection] response: {:#?}", response);
         stream.write_all(response.as_bytes()).unwrap();
     } else {
         let status_line = "HTTP/1.1 404";
