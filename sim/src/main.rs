@@ -5,6 +5,7 @@ use std::{
 use std::{panic, fs};
 use std::{thread, time};
 use std::collections::HashMap;
+use std::env;
 
 use serde_json;
 
@@ -22,7 +23,54 @@ use crate::sim::*;
  * The requests are in a Json string
  *
  */
+
+fn cli_help() {
+    println!("Usage:
+    -H  HTML server
+    -T  Self Test
+");
+}
+
+enum SimMode {
+    NONE,
+    HTML_SERVER,
+    SELF_TEST,
+}
+
 fn main() {
+    let args: Vec<String> = env::args().collect();
+    println!("args: {:?}", args);
+    let mut sim_mode = SimMode::NONE;
+
+    match args.len() {
+        // no arguments passed
+        1 => {
+            cli_help();
+        },
+        // one argument passed
+        2 => {
+            match args[1].as_str() {
+                "-H" => sim_mode=SimMode::HTML_SERVER,
+                "-T" => sim_mode=SimMode::SELF_TEST,
+                _ => cli_help(),
+            }
+        },
+        _ => {
+            cli_help();
+        }
+    }
+    match sim_mode {
+        SimMode::HTML_SERVER => {server_loop();},
+        SimMode::SELF_TEST => {self_test();},
+        _ => {}
+    }
+}
+
+fn self_test() {
+    // TODO
+}
+
+fn server_loop() {
     let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
     listener.set_nonblocking(true).expect("Cannot set non-blocking");
 
@@ -49,7 +97,6 @@ fn main() {
 
     }
 }
-
 
 
 fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &mut HashMap<i32, Simulator>) {

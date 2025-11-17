@@ -1,5 +1,5 @@
 #!/bin/sh
 
-RUST_BACKTRACE=1 RUST_BACKTRACE=full cargo run
+RUST_BACKTRACE=1 RUST_BACKTRACE=full cargo run -- -H
 
 
