@@ -2,7 +2,7 @@ clang --target=riscv64-unknown-none-elf add.c -o add.elf -nostdlib -march=rv64i 
 
 clang --target=riscv64-unknown-none-elf add.c -o add.elf -nostdlib -march=rv64i -mabi=lp64 -Wl,-T,link.ld
 
-clang --target=riscv64-lp64-none-elf add.S add.c -o add.elf -nostdlib -march=rv64i -mabi=lp64 -Wl,-T,link.ld
+clang --target=riscv64-lp64-none-elf add.S add.c -o add.elf -nostdlib -march=rv64i -mabi=lp64 -Wl,-T,link.ld -fuse-ld=lld
 
 llvm-objcopy add.elf -O binary ../../image
 
