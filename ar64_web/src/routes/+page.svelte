@@ -63,17 +63,17 @@
 			)*/
 	}
 	const handle_step = async () => {
-        const task = {"action": "step"};
+        const task = {"action": {"name": "step"}};
 		let res = await send_request(task);
 		sim = res.sim
 	};
 	const handle_image_load = async () => {
-        const task = {"action": "load image"};
+        const task = {"action": {"name": "load image", "location": "/home/iame/Desktop/programming/non-school/ar64/image"}};
 		let res = await send_request(task);
 		sim = res.sim
 	};
 	const get_default_simulator = async () => {
-        const task = {"action": "init"};
+        const task = {"action": {"name": "init"}};
 		let res = await send_request(task);
 		sim = res.sim
 	};

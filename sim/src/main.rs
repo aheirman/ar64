@@ -26,8 +26,8 @@ use crate::sim::*;
 
 fn cli_help() {
     println!("Usage:
-    -H  HTML server
-    -T  Self Test
+    -H port  HTML server
+    -T path  Self Test
 ");
 }
 
@@ -43,35 +43,35 @@ fn main() {
     let mut sim_mode = SimMode::NONE;
 
     match args.len() {
-        // no arguments passed
-        1 => {
-            cli_help();
-        },
-        // one argument passed
-        2 => {
+        3 => {
             match args[1].as_str() {
                 "-H" => sim_mode=SimMode::HTML_SERVER,
                 "-T" => sim_mode=SimMode::SELF_TEST,
                 _ => cli_help(),
             }
-        },
-        _ => {
-            cli_help();
         }
+        1 | 2 | _ => {
+            cli_help();
+        },
     }
     match sim_mode {
-        SimMode::HTML_SERVER => {server_loop();},
-        SimMode::SELF_TEST => {self_test();},
+        SimMode::HTML_SERVER => {
+            match args[2].parse() {
+                Ok(port_number) => server_loop(port_number),
+                _ => cli_help()
+            }
+            },
+        SimMode::SELF_TEST => {self_test(args[2].as_str());},
         _ => {}
     }
 }
 
-fn self_test() {
+fn self_test(test_binary_location: &str) {
     // TODO
 }
 
-fn server_loop() {
-    let listener = TcpListener::bind("127.0.0.1:6379").unwrap();
+fn server_loop(port_number: u32) {
+    let listener = TcpListener::bind(format!("127.0.0.1:{:}", port_number)).unwrap();
     listener.set_nonblocking(true).expect("Cannot set non-blocking");
 
     let mut simulators = HashMap::new();
@@ -148,9 +148,9 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
         //println!("[handle_connection] device_index: {:#?}", simulator_key);
         let possible_sim = &mut simulators.get_mut(&simulator_key);
 
-        if let Some(action) = body.get_mut("action").unwrap().as_str() {
+        if let Some(action_name) = body["action"]["name"].as_str() {
         
-            match action {
+            match action_name {
                 "init" => {
                     println!("INIT at {:}", next_index);
                     simulators.insert(*next_index, default_sim());
@@ -164,8 +164,9 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
                     
                 }
                 "load image" => {
-                    println!("load image");
-                    let res = &fs::read("/home/iame/Desktop/programming/non-school/ar64/image");
+                    let location = body["action"]["location"].as_str().unwrap();
+                    println!("load image at: {:?}", location);
+                    let res = &fs::read(location);
                     
                     let mut sim = &mut simulators.get_mut(&simulator_key).unwrap();
                     match res {
