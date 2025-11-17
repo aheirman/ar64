@@ -18,7 +18,7 @@ function run_single_test() {
     popd
 
     pushd ./../sim
-    RUST_BACKTRACE=1 RUST_BACKTRACE=full cargo run -- -T "./riscv-tests/isa/$1.bin"
+    RUST_BACKTRACE=1 RUST_BACKTRACE=full cargo run -- -T "./../tests/riscv-tests/isa/$1.bin"
     if [ $? -gt 0 ]; then
         echo "Test failed!"
         exit $?

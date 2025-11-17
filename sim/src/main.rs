@@ -70,7 +70,16 @@ fn main() -> ExitCode {
 }
 
 fn self_test(test_binary_location: &str) -> ExitCode {
-    // TODO
+    let mut sim = default_sim();
+    match load_image(&mut sim, test_binary_location) {
+        Err(()) => {return ExitCode::FAILURE;},
+        _ => {}
+    }
+    for _ in 1..100 {
+        step(&mut sim);
+    }
+
+
     ExitCode::SUCCESS
 }
 
@@ -102,6 +111,37 @@ fn server_loop(port_number: u32) {
     }
 }
 
+fn load_image(sim: &mut Simulator, path: &str) -> Result<(), ()>{
+    let res = &fs::read(path);
+    match res {
+        Err(e) => {
+            let p = String::from(format!("ERRROR: failed to load image! {:?}", e));
+            println!("{}", p);
+            sim.log = p;
+            return Err(());
+        },
+        Ok(file) => {
+            //sim.mem = file.to_vec();
+            if sim.mem.len() >= file.len() {
+                for i in 0..file.len() {
+                    sim.mem[i] = file[i]
+                }
+                for i in file.len()..sim.mem.len() {
+                    sim.mem[i] = 0
+                }
+                let p = String::from(format!("INFO file ({}) is loaded", path));
+                println!("{}", p);
+                sim.log = p;
+                return Ok(());
+            } else {
+                let p = String::from(format!("ERROR file size ({}) is larger than the memory of the sim({})!", file.len(), sim.mem.len()));
+                println!("{}", p);
+                sim.log = p;
+                return Err(());
+            }
+        },
+    }
+}
 
 fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &mut HashMap<i32, Simulator>) {
     let buf_reader = BufReader::new(&mut stream);
@@ -130,13 +170,13 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
         let mut body: serde_json::Value = serde_json::from_str(str_body).unwrap();
 
 
-        let mut debug = match body.get_mut("debug"){
-            Some(debug_text) => {
-                println!("[handle_connection] debug_text: {:#?}", debug_text);
-                debug_text == "1"
-            }
-            _ => false
-        };
+        // let mut debug = match body.get_mut("debug"){
+        //     Some(debug_text) => {
+        //         println!("[handle_connection] debug_text: {:#?}", debug_text);
+        //         debug_text == "1"
+        //     }
+        //     _ => false
+        // };
 
         let simulator_key = match body.get_mut("device_index"){
             Some(device_index) => {
@@ -170,34 +210,16 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
                 "load image" => {
                     let location = body["action"]["location"].as_str().unwrap();
                     println!("load image at: {:?}", location);
-                    let res = &fs::read(location);
                     
                     let mut sim = &mut simulators.get_mut(&simulator_key).unwrap();
-                    match res {
-                        Err(e) => {sim.log =  String::from(format!("ERRROR: failed to load image! {:?}", e))},
-                        Ok(file) => {
-                            //sim.mem = file.to_vec();
-                            for i in 0..file.len() {
-                                sim.mem[i] = file[i]
-                            }
-                            for i in file.len()..sim.mem.len() {
-                                sim.mem[i] = 0
-                            }
-
-
-                        },
-                    }
-                    
-                    
+                    load_image(&mut sim, location);                    
                 }
                 _ => {
                     println!("ERROR unknown request");
-                    debug = false;
                 }
             }
         } else {
             println!("ERROR unknown status");
-            debug = false;
         }
 
         

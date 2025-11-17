@@ -140,7 +140,7 @@ pub fn default_sim() -> Simulator {
     return Simulator{
         states: states,
         // fill mem with NOP
-        mem: vec![0; 1024],
+        mem: vec![0; 8192],
         csr: default_csr(),
         log: String::from("OK"),
         sim_out: String::from(""),
@@ -389,7 +389,6 @@ pub fn step(sim: &mut Simulator) {
 
         state.last_pc = pc;
         let ir: u32 = u32::from_le_bytes(sim.mem[pc as usize .. (pc + 4) as usize ].try_into().unwrap());
-        
         // clear sim out
         sim.sim_out = String::from("");
         state.last_instruction = format!("{:X}", ir);
