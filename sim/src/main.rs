@@ -32,7 +32,7 @@ fn main() {
         //println!("GOT A REQUEST! 1");
         match stream {
             Ok(stream) => {
-                println!("GOT A REQUEST!");
+                //println!("GOT A REQUEST!");
         
                 handle_connection(&mut next_index, stream, &mut simulators);
                 //println!("GOT A REQUEST! finished");
@@ -61,7 +61,7 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
         .lines()
         .map(|result| result.unwrap())
         .take_while(|line| {
-            println!("line: {:?}", line);
+            //println!("line: {:?}", line);
             if !line.is_empty() {last_line_non_empty = true; return true;}
             if last_line_non_empty {last_line_non_empty = false; return true;}
             return false;
@@ -70,11 +70,11 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
         .collect();
 
         
-    println!("[handle_connection] Request: {:#?}", http_request);
+    //println!("[handle_connection] Request: {:#?}", http_request);
 
     // INSANE HACK
     let str_body = &http_request[http_request.len()-2];
-    println!("request body: {:?}", str_body);
+    //println!("request body: {:?}", str_body);
     if str_body.starts_with('{') {
         let mut body: serde_json::Value = serde_json::from_str(str_body).unwrap();
 
@@ -98,7 +98,7 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
             println!("[handle_connection - WARN] device_index: {:#?} is not in map", simulator_key);
         }
 
-        println!("[handle_connection] device_index: {:#?}", simulator_key);
+        //println!("[handle_connection] device_index: {:#?}", simulator_key);
         let possible_sim = &mut simulators.get_mut(&simulator_key);
 
         if let Some(action) = body.get_mut("action").unwrap().as_str() {
@@ -165,7 +165,7 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
 
         let response = format!("{status_line}\r\nContent-Length: {http_length}\r\n\r\n{http_contents}");
 
-        println!("[handle_connection] response: {:#?}", response);
+        //println!("[handle_connection] response: {:#?}", response);
         stream.write_all(response.as_bytes()).unwrap();
     } else {
         let status_line = "HTTP/1.1 404";

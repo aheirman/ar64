@@ -84,7 +84,7 @@
 	let status = "NO CONNECTION!"
 	
 	$: log  = sim.log;
-	$: uart_out = ""//String.fromCharCode(...sim.uart_out);
+	$: uart_out = String.fromCharCode(...sim.uart_out);
 	$: sim_out = sim.sim_out;
 	$: mem2D = gen2Dmem(sim);
 

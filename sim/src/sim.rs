@@ -134,13 +134,13 @@ fn default_csr() -> Vec<u64> {
 
 pub fn default_sim() -> Simulator {
     let mut states = Vec::new();
-    for i in 0..2 {
+    for i in 0..1 {
         states.push(default_cpu_state());
     }
     return Simulator{
         states: states,
         // fill mem with NOP
-        mem: vec![0; 256],
+        mem: vec![0; 1024],
         csr: default_csr(),
         log: String::from("OK"),
         sim_out: String::from(""),
@@ -321,8 +321,7 @@ fn load(mem: &mut Vec<u8>, func3: u8, address: u64) -> u64{
             },
         }
         
-    } 
-    else if address == 0x10000000 {
+    } else if address == 0x10000000 {
         // uart
     } else if address <= 0x1000007 {
         println!("WARN on: {}, READING UART STATUS REGISTERS IS NOT SUPPORTED, address: {:X}", line!(), address);
@@ -364,13 +363,13 @@ fn store(mem: &mut Vec<u8>, func3: u8, address: u64, rs2: u64, uart_out: &mut Ve
                 println!("errored on: {}", line!());
             },
         }
-    } else if address == 0x1000007 {
+    } else if address == 0x10000000 {
         // UART
         uart_out.push(rs2 as u8)
-    } else if (0x10000000..0x1000007).contains(&address)  {
+    } else if (0x10000000..0x10000007).contains(&address)  {
         println!("WARN on: {}, WRITING UART STATUS REGISTERS IS NOT SUPPORTED, address: {:X}, value: {:X}", line!(), address, rs2);
     } else {
-        println!("errored on: {}, address: {:X}", line!(), address);
+        println!("errored on: {}, address: 0x{:X}", line!(), address);
         //sim.state = false;
     }
 }
