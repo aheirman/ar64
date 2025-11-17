@@ -17,14 +17,16 @@
 
 
 	const send_request = async (task) => {
+		const request_body = JSON.stringify(task)+"\r\n"+"\r\n"
 		const request = new Request('http://localhost:5173/api/ar64', {
             method: 'POST',
-            body: JSON.stringify(task)+"\r\n"+"\r\n"
+            body: request_body
         });
-		
+		console.log("send_request: " + request_body)
         return fetch(request)
             .then(function (response) {
-                console.log("response: " + response.status)
+                console.log("response: " + response)
+				console.log("response status: " + response.status)
 				if (response.status == 200) {
                     return response.blob();
                 }
@@ -74,7 +76,6 @@
         const task = {"action": "init"};
 		let res = await send_request(task);
 		sim = res.sim
-		console.log('get_default_simulator: ' +sim)
 	};
 
 	get_default_simulator();

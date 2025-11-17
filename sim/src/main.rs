@@ -54,15 +54,16 @@ fn main() {
 
 fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &mut HashMap<i32, Simulator>) {
     let buf_reader = BufReader::new(&mut stream);
-    let mut first = true;
+    let mut last_line_non_empty = true;
 
     //println!("[handle_connection]");
     let http_request: Vec<_> = buf_reader
         .lines()
         .map(|result| result.unwrap())
         .take_while(|line| {
-            if !line.is_empty() {return true;}
-            if first {first = false; return true;}
+            println!("line: {:?}", line);
+            if !line.is_empty() {last_line_non_empty = true; return true;}
+            if last_line_non_empty {last_line_non_empty = false; return true;}
             return false;
         }
         )
@@ -70,8 +71,10 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
 
         
     println!("[handle_connection] Request: {:#?}", http_request);
-    let str_body = http_request.last().unwrap();
-    //println!("body: {:?}", body);
+
+    // INSANE HACK
+    let str_body = &http_request[http_request.len()-2];
+    println!("request body: {:?}", str_body);
     if str_body.starts_with('{') {
         let mut body: serde_json::Value = serde_json::from_str(str_body).unwrap();
 
@@ -145,36 +148,29 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
             debug = false;
         }
 
-        let mut contents = String::from("");
-        if true {
-            let sim = &mut simulators.get_mut(&simulator_key).unwrap();
-            contents += &*serde_json::to_string(&sim).unwrap();
+        
+        let mut sim_contents = String::from("");
+        let possible_sim2 = &mut simulators.get_mut(&simulator_key);
+        match possible_sim2 {
+            Some(ref mut sim) => sim_contents = (&*serde_json::to_string(&sim).unwrap()).to_string(),
+            _ => println!("ERROR simulator not available"),
         }
-        let length = contents.len();
-    
+        let http_contents = format!("{{\"simulator_key\": {simulator_key},\r\n\"sim\": {sim_contents}\r\n}}");
+
         // RETURN
         // PACKET
     
         let status_line = "HTTP/1.1 200 OK";
+        let http_length = http_contents.len();
 
+        let response = format!("{status_line}\r\nContent-Length: {http_length}\r\n\r\n{http_contents}");
 
-        let response = format!(
-            "{status_line}\r\n
-            {{
-                \"simulator_key\": {simulator_key},\r\n
-                \"sim\": {contents},\r\n
-                \"Content-Length\": {length}\r\n
-            }} 
-            \r\n"
-        );
-
-
-        //println!("[handle_connection] response: {:#?}", response);
+        println!("[handle_connection] response: {:#?}", response);
         stream.write_all(response.as_bytes()).unwrap();
     } else {
         let status_line = "HTTP/1.1 404";
         let response = format!(
-            "{status_line}"
+            "{status_line}\r\n\r\n"
         );
     
         println!("[ERROR - handle_connection] response: {:#?}", response);
