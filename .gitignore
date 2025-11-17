@@ -10,6 +10,7 @@ sim/target
 *.bin
 *.pdf
 *.lock
+*.json
 
 sixel/.cache/
 sixel/package-lock.json

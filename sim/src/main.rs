@@ -6,6 +6,7 @@ use std::{panic, fs};
 use std::{thread, time};
 use std::collections::HashMap;
 use std::env;
+use std::process::ExitCode;
 
 use serde_json;
 
@@ -37,7 +38,7 @@ enum SimMode {
     SELF_TEST,
 }
 
-fn main() {
+fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     println!("args: {:?}", args);
     let mut sim_mode = SimMode::NONE;
@@ -54,6 +55,7 @@ fn main() {
             cli_help();
         },
     }
+    let mut exit_code = ExitCode::from(1);
     match sim_mode {
         SimMode::HTML_SERVER => {
             match args[2].parse() {
@@ -61,13 +63,15 @@ fn main() {
                 _ => cli_help()
             }
             },
-        SimMode::SELF_TEST => {self_test(args[2].as_str());},
+        SimMode::SELF_TEST => {exit_code = self_test(args[2].as_str());},
         _ => {}
     }
+    return exit_code;
 }
 
-fn self_test(test_binary_location: &str) {
+fn self_test(test_binary_location: &str) -> ExitCode {
     // TODO
+    ExitCode::SUCCESS
 }
 
 fn server_loop(port_number: u32) {
