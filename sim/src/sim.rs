@@ -597,10 +597,19 @@ pub fn step(sim: &mut Simulator) {
                             // cause a precise trap to the supporting execution environment
                             // set epc register for the recieving privilidge mode to the address of the ECALL and EBREAK instructions themselves
                             
-                            // set xPIE: holds the value of the interrupt-enable bit active prior to the trap
-                            // xPP holds the previous priviledge mode
+                            // When a hart is executing in privilege mode x, interrupts are globally enabled when xIE=1 and globally disabled when xIE=0
+                            // nterrupts for lower-privilege modes, w<x, are always globally disabled
+                            // regardless of the setting of any global wIE bit for the lower-privilege mode. Interrupts for higher-
+                            // privilege modes, y>x, are always globally enabled regardless of the setting of the global yIE bit for the
+                            // higher-privilege mode
+                            //
+                            // xPIE:    holds the value of the interrupt-enable bit active prior to the trap
+                            // xPP:     holds the previous privilege mode up to mode x
                             // MPP is 2 bits wide
                             // SPP is 1 bit wide
+
+                            // When a trap is taken from privilege mode y 
+                            // into privilege mode x, xPIE is set to the value of xIE; xIE is set to 0; and xPP is set to y.
 
                             /*
                              * There exists 4 kinds of traps
@@ -623,8 +632,16 @@ pub fn step(sim: &mut Simulator) {
                             let mtvec : u64 = csr[CsrAddress::MTVEC ];
                             let mtvec_mode  : u8  =(mtvec &  0b11) as u8;
                             let mtvec_base  : u64 = mtvec & !0b11;
-                            let cause = 0; // TOOD
                             
+                            let cause = match state.priviledge_mode {
+                                0b00 => 8,  // Environment call from U-mode
+                                0b01 => 9,  // Environment call from S-mode
+                                0b11 => 11, // Environment call from M-mode
+                                _ => {unreachable!();},
+                            };
+
+                            let is_synchronous_exception = true;
+
                             csr[CsrAddress::MEPC]   = pc & !0b11; // IALIGN is 32 bit
 
                             /*
@@ -633,18 +650,20 @@ pub fn step(sim: &mut Simulator) {
                              *      10: RESERVED
                              *      11: M
                              */
-                            csr[CsrAddress::MCAUSE] = match state.priviledge_mode {
-                                0b00 => 8,
-                                0b01 => 9,
-                                0b11 => 11,
-                                _ => {unreachable!();},
-                            };
+                            csr[CsrAddress::MCAUSE] = cause;
+                            
 
                             match mtvec_mode {
                                 // Direct
                                 0 => {npc = Some(mtvec_base);},
                                 //Vectored
-                                1 => {npc = Some(mtvec_base + 4*cause);},
+                                1 => {
+                                    if (is_synchronous_exception){
+                                        npc = Some(mtvec_base);
+                                    } else {
+                                        npc = Some(mtvec_base + 4*cause);
+                                    }
+                                },
                                 _ => {unreachable!();},
                             }
 
