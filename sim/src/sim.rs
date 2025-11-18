@@ -156,15 +156,83 @@ pub fn default_sim() -> Simulator {
 
 
 
-fn catch_trap(pc : & mut u64, csr : & Vec<u64>) {
+fn handle_trap(pc : u64, state: &mut CpuState, csr : &mut Vec<u64>) -> u64{
 
 
     //let mcause_exepction_code : u64 = csr[CsrAddress::MCAUSE ] & 0x7FFFFFFFFFFFFFFF;
 
     //TODO: handle MEDELEG & MIDELEG
 
+    // When a hart is executing in privilege mode x, interrupts are globally enabled when xIE=1 and globally disabled when xIE=0
+    // nterrupts for lower-privilege modes, w<x, are always globally disabled
+    // regardless of the setting of any global wIE bit for the lower-privilege mode. Interrupts for higher-
+    // privilege modes, y>x, are always globally enabled regardless of the setting of the global yIE bit for the
+    // higher-privilege mode
+    //
+    // xPIE:    holds the value of the interrupt-enable bit active prior to the trap
+    // xPP:     holds the previous privilege mode up to mode x
+    // MPP is 2 bits wide
+    // SPP is 1 bit wide
 
+    // When a trap is taken from privilege mode y 
+    // into privilege mode x, xPIE is set to the value of xIE; xIE is set to 0; and xPP is set to y.
 
+    /*
+        * There exists 4 kinds of traps
+        *
+        * 1) contained:  trap is visible to and handled by software running inside the execution environment
+        * 2) Requested:  trap is synchronous exception that is an explicit call to the execution environment
+        * 3) Invisible:  Trap is handled transparantly by the execution environment and execution resumes normally after trap is handled
+        * 4) Fatal trap: Causes the execution environment to terminate execution
+        *
+        * By default all traps, at any priveledge level, are handled in machine mode. 
+        * These can be redirected with MRET to the appropriate level.
+        * Alternatively, with MEDELEG and MIDELEG can delegate the trap to the S-mode trap handler, 
+        *  when this occurs, the delegated inturrupts are masked at the delegator level.
+        * 
+        * When a trap is taken into M-mode, MEPC is written with the virtual address of the instruction that was interrupted or that encountered the exception.
+        * When a trap is taken into M-mode, MCAUSE is written with a code indicating the event that caused the trap.
+        *
+        */
+
+    let mtvec : u64 = csr[CsrAddress::MTVEC ];
+    let mtvec_mode  : u8  =(mtvec &  0b11) as u8;
+    let mtvec_base  : u64 = mtvec & !0b11;
+    
+    let cause = match state.priviledge_mode {
+        0b00 => 8,  // Environment call from U-mode
+        0b01 => 9,  // Environment call from S-mode
+        0b11 => 11, // Environment call from M-mode
+        _ => {unreachable!();},
+    };
+
+    let is_synchronous_exception = true;
+
+    csr[CsrAddress::MEPC]   = pc & !0b11; // IALIGN is 32 bit
+
+    /*
+        *      00: U
+        *      01: S
+        *      10: RESERVED
+        *      11: M
+        */
+    csr[CsrAddress::MCAUSE] = cause;
+    
+    let mut npc = 0;
+    match mtvec_mode {
+        // Direct
+        0 => {npc = mtvec_base;},
+        //Vectored
+        1 => {
+            if (is_synchronous_exception){
+                npc = mtvec_base;
+            } else {
+                npc = mtvec_base + 4*cause;
+            }
+        },
+        _ => {unreachable!();},
+    }
+    return npc;
 }
 
 /*
@@ -585,7 +653,7 @@ pub fn step(sim: &mut Simulator) {
 
             },
             0b11100 => { // SYSTEM
-                let csr = &mut sim.csr;
+                let mut csr = &mut sim.csr;
                 let is_imm2 = func3 & 0b100 != 0;
                 if is_imm2 {rs1 = rs1i as u64;};
 
@@ -597,76 +665,7 @@ pub fn step(sim: &mut Simulator) {
                             // cause a precise trap to the supporting execution environment
                             // set epc register for the recieving privilidge mode to the address of the ECALL and EBREAK instructions themselves
                             
-                            // When a hart is executing in privilege mode x, interrupts are globally enabled when xIE=1 and globally disabled when xIE=0
-                            // nterrupts for lower-privilege modes, w<x, are always globally disabled
-                            // regardless of the setting of any global wIE bit for the lower-privilege mode. Interrupts for higher-
-                            // privilege modes, y>x, are always globally enabled regardless of the setting of the global yIE bit for the
-                            // higher-privilege mode
-                            //
-                            // xPIE:    holds the value of the interrupt-enable bit active prior to the trap
-                            // xPP:     holds the previous privilege mode up to mode x
-                            // MPP is 2 bits wide
-                            // SPP is 1 bit wide
-
-                            // When a trap is taken from privilege mode y 
-                            // into privilege mode x, xPIE is set to the value of xIE; xIE is set to 0; and xPP is set to y.
-
-                            /*
-                             * There exists 4 kinds of traps
-                             *
-                             * 1) contained:  trap is visible to and handled by software running inside the execution environment
-                             * 2) Requested:  trap is synchronous exception that is an explicit call to the execution environment
-                             * 3) Invisible:  Trap is handled transparantly by the execution environment and execution resumes normally after trap is handled
-                             * 4) Fatal trap: Causes the execution environment to terminate execution
-                             *
-                             * By default all traps, at any priveledge level, are handled in machine mode. 
-                             * These can be redirected with MRET to the appropriate level.
-                             * Alternatively, with MEDELEG and MIDELEG can delegate the trap to the S-mode trap handler, 
-                             *  when this occurs, the delegated inturrupts are masked at the delegator level.
-                             * 
-                             * When a trap is taken into M-mode, MEPC is written with the virtual address of the instruction that was interrupted or that encountered the exception.
-                             * When a trap is taken into M-mode, MCAUSE is written with a code indicating the event that caused the trap.
-                             *
-                             */
-
-                            let mtvec : u64 = csr[CsrAddress::MTVEC ];
-                            let mtvec_mode  : u8  =(mtvec &  0b11) as u8;
-                            let mtvec_base  : u64 = mtvec & !0b11;
-                            
-                            let cause = match state.priviledge_mode {
-                                0b00 => 8,  // Environment call from U-mode
-                                0b01 => 9,  // Environment call from S-mode
-                                0b11 => 11, // Environment call from M-mode
-                                _ => {unreachable!();},
-                            };
-
-                            let is_synchronous_exception = true;
-
-                            csr[CsrAddress::MEPC]   = pc & !0b11; // IALIGN is 32 bit
-
-                            /*
-                             *      00: U
-                             *      01: S
-                             *      10: RESERVED
-                             *      11: M
-                             */
-                            csr[CsrAddress::MCAUSE] = cause;
-                            
-
-                            match mtvec_mode {
-                                // Direct
-                                0 => {npc = Some(mtvec_base);},
-                                //Vectored
-                                1 => {
-                                    if (is_synchronous_exception){
-                                        npc = Some(mtvec_base);
-                                    } else {
-                                        npc = Some(mtvec_base + 4*cause);
-                                    }
-                                },
-                                _ => {unreachable!();},
-                            }
-
+                            npc = Some(handle_trap(pc, &mut state, &mut csr));
 
                             println!("ERROR! unimplemented, line: {}", line!());
                         } else if imm == 0b000000000001 { // EBREAK
