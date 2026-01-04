@@ -230,6 +230,7 @@ fn handle_trap(pc : u64, state: &mut CpuState, csr : &mut HashMap<u32, u64>) -> 
     let cause = match state.priviledge_mode {
         0b00 => 8,  // Environment call from U-mode
         0b01 => 9,  // Environment call from S-mode
+        0b11 => 10, // Environment call from H-mode
         0b11 => 11, // Environment call from M-mode
         _ => {unreachable!();},
     };
@@ -470,14 +471,14 @@ fn store(mem: &mut Vec<u8>, func3: u8, address: u64, rs2: u64, uart_out: &mut Ve
     }
 }
 
-pub fn step(sim: &mut Simulator) {
+pub fn step(sim: &mut Simulator) -> bool{
     let states = &mut sim.states;
 
+    let should_continue = true;
 
 
 
     for i in 0..states.len(){ // step all HARTs
-        println!("INFO: step for hart {}", i);
         let mut state = &mut states[i];
         
         // fetch
@@ -511,8 +512,8 @@ pub fn step(sim: &mut Simulator) {
         // 32 bit
         if ((ir & 0b11) != 3) || ((ir & 0b11100) == 0b11100)  {
             sim.log = err;
-            println!("errored on: {}", line!());
-            return
+            println!("ERROR: line {}", line!());
+            return false;
         }
 
         // decode 
@@ -573,7 +574,7 @@ pub fn step(sim: &mut Simulator) {
             _ => { 
                 sim.log = err;
                 println!("errored on: {}", line!());
-                return
+                return false;
             }
         }
 
@@ -660,7 +661,7 @@ pub fn step(sim: &mut Simulator) {
                         if rs2 > 63 {
                             sim.log = String::from("Attempted to bit shift left too much!");
                             println!("errored on: {}", line!());
-                            return
+                            return false;
                         }
                         rd = rs1 << rs2
                     }, //SLLI SLL
@@ -673,7 +674,7 @@ pub fn step(sim: &mut Simulator) {
                     _ => {
                         sim.log = err;
                         println!("ERROR! incorrect func3!, line: {}", line!());
-                        return
+                        return false;
                     }
                 }
             },
@@ -683,6 +684,8 @@ pub fn step(sim: &mut Simulator) {
             },
             0b11100 => { // SYSTEM
                 let mut csr = &mut sim.csr;
+
+                // handle uimm versions
                 let is_imm2 = func3 & 0b100 != 0;
                 if is_imm2 {rs1 = rs1i as u64;};
 
@@ -697,9 +700,11 @@ pub fn step(sim: &mut Simulator) {
                             npc = Some(handle_trap(pc, &mut state, &mut csr));
 
                             println!("ERROR! unimplemented, line: {}", line!());
+                            return false;
                         } else if imm == 0b000000000001 { // EBREAK
 
                             println!("ERROR! unimplemented, line: {}", line!());
+                            return false;
                         } 
                         
                         // TODO: pop the relevant lower-privilege interrupt enable and privilege mode stack
@@ -710,6 +715,7 @@ pub fn step(sim: &mut Simulator) {
                             
                             npc = Some(csr[&csr_address::SEPC ]);
                             println!("ERROR! unimplemented, line: {}", line!());
+                            return false;
                         } else if imm == 0b001100000010 { // MRET 18.6.4
                             // new privilege mode based on MPP and MPV in mstatus ro mstatush
                             // mpv=0
@@ -718,8 +724,11 @@ pub fn step(sim: &mut Simulator) {
                             // mpie=1
                             // priv = new_privilege_mode;
                             npc = Some(csr[&csr_address::MEPC ]);
+                            println!("ERROR! unimplemented, line: {}", line!());
+                            return false;
                         } else{
                             println!("ERROR! incorrect func3!, line: {}", line!());
+                            return false;
                         }
                         // set cause
                         // set pc
@@ -735,7 +744,7 @@ pub fn step(sim: &mut Simulator) {
                         }
                         sim.csr.insert(imm, rs1);
                     },
-                    0b010 => {
+                    0b10 => {
                         // CSRRS(I)
                         rd = sim.csr[&imm]; //TODO zero extend
                         if rs1i != 0 { // THIS ALSO CHECKS THE uimm AS PER THE SPEC
@@ -743,7 +752,7 @@ pub fn step(sim: &mut Simulator) {
                         }
                         
                     },
-                    0b011 => {
+                    0b11 => {
                         // CSRRC(I)
                         rd = sim.csr[&imm]; //TODO zero extend
                         if rs1i != 0 {
@@ -784,7 +793,7 @@ pub fn step(sim: &mut Simulator) {
                     _ => {
                         sim.log = err;
                         println!("ERROR! incorrect func3!, line: {}", line!());
-                        return
+                        return false;
                     }
                 }
             },
@@ -792,7 +801,7 @@ pub fn step(sim: &mut Simulator) {
             _ => {
                 sim.log = err;
                 println!("errored on: {}", line!());
-                return
+                return false;
             },
         }
 
@@ -809,5 +818,5 @@ pub fn step(sim: &mut Simulator) {
          
         sim.log = rd.to_string();//String::from("OK");
     }
-    
+    return should_continue;
 }

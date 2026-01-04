@@ -75,8 +75,13 @@ fn self_test(test_binary_location: &str) -> ExitCode {
         Err(()) => {return ExitCode::FAILURE;},
         _ => {}
     }
-    for _ in 1..100 {
-        step(&mut sim);
+
+    let mut should_continue = true;
+    let mut step_index = 0;
+    while should_continue {
+        println!("INFO: step index {}", step_index);
+        should_continue = step(&mut sim);
+        step_index += 1;
     }
 
 
@@ -202,7 +207,7 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
                 "step" => {
                     //println!("STEP");
                     match possible_sim {
-                        Some(ref mut sim) => step(sim),
+                        Some(ref mut sim) => _ = step(sim),
                         _ => println!("ERROR"),
                     }
                     
