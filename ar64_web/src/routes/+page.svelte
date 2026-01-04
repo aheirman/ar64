@@ -108,6 +108,9 @@
 
 
 <body>	
+	<link rel="preconnect" href="https://fonts.googleapis.com">
+	<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+	<link href="https://fonts.googleapis.com/css2?family=Cascadia+Code:ital,wght@0,200..700;1,200..700&family=Inconsolata:wght@200..900&display=swap" rel="stylesheet">
 	<div class="vert">
 		<div class="options">
 			<button id="button_load" on:click={handle_image_load}>
@@ -136,22 +139,17 @@
 				{/each}
 			</div> 
 			<div class="memory">
-				<div class="row-index">
-					{#each mem2D as row, i}
-						<div>{(i*bytes_per_row).toString(16)}</div>
-					{/each}
-				</div>
-				<div>
 				{#each mem2D as row, i}
-					<div class="row">
-					{#each row as v, j}
-						<div style="color: {(i*bytes_per_row + j - state.pc in [0, 1, 2, 3]) ? '#333': ((i*bytes_per_row + j - state.last_pc in [0, 1, 2, 3]) ? '#afa': '#999')}">{(v).toString(16).padStart(2,'0')}</div>
-					{/each}
+					<div class="memory_row" style="color: {(i*bytes_per_row - state.pc in [0]) ? '#666': ((i*bytes_per_row - state.last_pc in [0]) ? '#afa': '#000')}">
+						<div class="row_index">{(i*bytes_per_row).toString(16)}</div>
+						<div class="data_row">
+						{#each row as v, j}
+							<div>{(v).toString(16).padStart(2,'0')}</div>
+						{/each}
+						</div>
 					</div>
 				{/each}
-				</div>
 			</div>
-
 		{/each}
 		<div class="uart">
 			{uart_out}
@@ -205,27 +203,30 @@
 	}
 	.memory {
 		display: flex;
-		flex-direction: row;
+		flex-direction: column;
 		border: 5px solid;
 	}
-	.row {
+	.memory_row {
 		display: flex;
 		flex-direction: row;
-		color: coral;
-		font-family: monospace;
-		font-size: 17px;
-	}
-	.row-index {
-		border-right: 10px;
-		border-right: solid;
-		border-right-color: black;
 		background-color: coral;
 		color: black;
+		font-family: "Cascadia Code", monospace;
+		font-variation-settings: "wdth" 300;
+		font-size: 14px;
+	}
+	.data_row {
+		display: flex;
+		flex-direction: row;
+		flex-grow: 0
+	}
+	.row_index {
+		border-right: 1px;
+		border-right: solid;
+		border-right-color: black;
 		padding-right: 5px;
 		overflow: auto;
-		width: 10;
-		font-family: monospace;
-		font-size: 17px;
+		flex-grow: 4
 	}
 
 	.uart {
