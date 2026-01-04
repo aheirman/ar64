@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use serde::{Serialize, Deserialize};
 
 macro_rules! declare_csr_consts {
-    ($vis:vis $GROUP:ident : &[$T:ty] = [$($name:ident = $value:expr),* $(,)?]) => {
+    ($vis:vis $GROUP:ident : &[$T:ty] = [$($name:ident = $value:expr; $mask:expr),* $(,)?]) => {
         mod csr_address {
             use std::collections::HashMap;
 
@@ -18,6 +18,12 @@ macro_rules! declare_csr_consts {
         pub fn get_address_to_name() -> HashMap<$T, String>{
             return HashMap::from([
                     $(($value, String::from(stringify!($name))),)*
+            ]);
+        }
+
+        pub fn get_address_to_mask() -> HashMap<$T, u64>{
+            return HashMap::from([
+                    $(($value, $mask),)*
             ]);
         }
 
@@ -31,59 +37,130 @@ macro_rules! declare_csr_consts {
 
 declare_csr_consts!(pub CSR_ADDRESSES: &[u32] = [
     // Supervisor Trap Setup
-    SSTATUS    = 0x100, 
-    SIE        = 0x104, // interrupt-enable register
-    STVEC      = 0x105, // trap handler base address
-    SCONTEREN  = 0x106, // counter enable
-    
+    SSTATUS    = 0x100; 0xFFFFFFFF, 
+    SIE        = 0x104; 0xFFFFFFFF, // interrupt-enable register
+    STVEC      = 0x105; 0xFFFFFFFF, // trap handler base address
+    SCONTEREN  = 0x106; 0xFFFFFFFF, // counter enable
+
     // Supervisor Configuration
-    SENCVFG    = 0x10A, // environment configuration register
+    SENCVFG    = 0x10A; 0xFFFFFFFF, // environment configuration register
 
     // Supervisor Trap Handling
-    SSCRATCH   = 0x140, // scratch reg for supervisor trap handlers
-    SEPC       = 0x141, // Exception program counter
-    SCAUSE     = 0x142, // trap cause
-    STVAL      = 0x143, // bad address or instruction
-    SIP        = 0x144, // interrupt pending
+    SSCRATCH   = 0x140; 0xFFFFFFFF, // scratch reg for supervisor trap handlers
+    SEPC       = 0x141; 0xFFFFFFFF, // Exception program counter
+    SCAUSE     = 0x142; 0xFFFFFFFF, // trap cause
+    STVAL      = 0x143; 0xFFFFFFFF, // bad address or instruction
+    SIP        = 0x144; 0xFFFFFFFF, // interrupt pending
 
     // Supervisor Protection and Translation
-    SATP       = 0x180, // Address Translation and Protection
+    SATP       = 0x180; 0xFFFFFFFF, // Address Translation and Protection
 
     // Debut/Trace Registers
-    SCONTEXT   = 0x5A8, // 
+    SCONTEXT   = 0x5A8; 0xFFFFFFFF, // 
     // Hypervisor *
 
     // Machine Information Registers
-    //MVENDORID = 0xF11, // vendor ID
-    //MARCHID   = 0xF12, // arch ID
-    //MIMPID    = 0xF13, // implementation ID
-    MHARTID    = 0xF14,
-    //MCONFIGPTR = 0xF15, // physical address of config ptr, not yet standardized!
+    //MVENDORID = 0xF11; 0xFFFFFFFF, // vendor ID
+    //MARCHID   = 0xF12; 0xFFFFFFFF, // arch ID
+    //MIMPID    = 0xF13; 0xFFFFFFFF, // implementation ID
+    MHARTID    = 0xF14; 0xFFFFFFFF,
+    //MCONFIGPTR = 0xF15; 0xFFFFFFFF, // physical address of config ptr, not yet standardized!
 
     //Machine Trap Setup
-    MSTATUS    = 0x300, // HART operating state
-    MISA       = 0x301, // WARL, ISA and extensions
-    MEDELEG    = 0x302, // WARL, exception delegation reg, If AND ONLY IF S-mode exists
-    MIDELEG    = 0x303, // WARL, interrupt delegation reg, If AND ONLY IF S-mode exists
-    MIE        = 0x304, // WARL, interrupt enable
-    MTVEC      = 0x305, // WARL, trap handler base address reg
-    MCOUNTEREN = 0x306, // counter enable
+    MSTATUS    = 0x300; 0xFFFFFFFF, // HART operating state
+    MISA       = 0x301; 0xFFFFFFFF, // WARL, ISA and extensions
+    MEDELEG    = 0x302; 0xFFFFFFFF, // WARL, exception delegation reg, If AND ONLY IF S-mode exists
+    MIDELEG    = 0x303; 0xFFFFFFFF, // WARL, interrupt delegation reg, If AND ONLY IF S-mode exists
+    MIE        = 0x304; 0xFFFFFFFF, // WARL, interrupt enable
+    MTVEC      = 0x305; 0xFFFFFFFF, // WARL, trap handler base address reg
+    MCOUNTEREN = 0x306; 0xFFFFFFFF, // counter enable
 
     // Machine Trap Handling
-    MSCRATCH  = 0x340, // register for trap handler
-    MEPC      = 0x341, // WARL, machine exception program counter
-    MCAUSE    = 0x342, // WLRL, trap cause
-    //MTVAL   = 0x343, // WARL, bad address or instruction, optional
-    MIP       = 0x344, // WARL, interrupt pending
-    // MTINST = 0x34A, // Hypervisor
-    // MTVAL2 = 0x34B, // Hypervisor
+    MSCRATCH  = 0x340; 0xFFFFFFFF, // register for trap handler
+    MEPC      = 0x341; 0xFFFFFFFF, // WARL, machine exception program counter
+    MCAUSE    = 0x342; 0xFFFFFFFF, // WLRL, trap cause
+    //MTVAL   = 0x343; 0xFFFFFFFF, // WARL, bad address or instruction, optional
+    MIP       = 0x344; 0xFFFFFFFF, // WARL, interrupt pending
+    // MTINST = 0x34A; 0xFFFFFFFF, // Hypervisor
+    // MTVAL2 = 0x34B; 0xFFFFFFFF, // Hypervisor
 
     // Machine Configuration
-    MENVCFG   = 0x30A, // environment configuration register
-    // MSECCFG    = 0x747, // security configuration reg
+    MENVCFG   = 0x30A; 0xFFFFFFFF, // environment configuration register
+    // MSECCFG    = 0x747; 0xFFFFFFFF, // security configuration reg
 
     // Machine Memory Protection
-
+    PMPCFG00  = 0x3A0; 0x00000000, // Physical memory protection configuration.
+    PMPCFG02  = 0x3A2; 0x00000000,
+    PMPCFG04  = 0x3A4; 0x00000000,
+    PMPCFG06  = 0x3A6; 0x00000000,
+    PMPCFG08  = 0x3A8; 0x00000000,
+    PMPCFG10  = 0x3AA; 0x00000000,
+    PMPCFG12  = 0x3AC; 0x00000000,
+    PMPCFG14  = 0x3AE; 0x00000000,
+    PMPADDR00 = 0x3B0; 0x00000000, // WARL, physical memory protection address register, only accessible to M-mode
+    PMPADDR01 = 0x3B1; 0x00000000,
+    PMPADDR02 = 0x3B2; 0x00000000,
+    PMPADDR03 = 0x3B3; 0x00000000,
+    PMPADDR04 = 0x3B4; 0x00000000,
+    PMPADDR05 = 0x3B5; 0x00000000,
+    PMPADDR06 = 0x3B6; 0x00000000,
+    PMPADDR07 = 0x3B7; 0x00000000,
+    PMPADDR08 = 0x3B8; 0x00000000,
+    PMPADDR09 = 0x3B9; 0x00000000,
+    PMPADDR10 = 0x3BA; 0x00000000,
+    PMPADDR11 = 0x3BB; 0x00000000,
+    PMPADDR12 = 0x3BC; 0x00000000,
+    PMPADDR13 = 0x3BD; 0x00000000,
+    PMPADDR14 = 0x3BE; 0x00000000,
+    PMPADDR15 = 0x3BF; 0x00000000,
+    PMPADDR16 = 0x3C0; 0x00000000,
+    PMPADDR17 = 0x3C1; 0x00000000,
+    PMPADDR18 = 0x3C2; 0x00000000,
+    PMPADDR19 = 0x3C3; 0x00000000,
+    PMPADDR20 = 0x3C4; 0x00000000,
+    PMPADDR21 = 0x3C5; 0x00000000,
+    PMPADDR22 = 0x3C6; 0x00000000,
+    PMPADDR23 = 0x3C7; 0x00000000,
+    PMPADDR24 = 0x3C8; 0x00000000,
+    PMPADDR25 = 0x3C9; 0x00000000,
+    PMPADDR26 = 0x3CA; 0x00000000,
+    PMPADDR27 = 0x3CB; 0x00000000,
+    PMPADDR28 = 0x3CC; 0x00000000,
+    PMPADDR29 = 0x3CD; 0x00000000,
+    PMPADDR30 = 0x3CE; 0x00000000,
+    PMPADDR31 = 0x3CF; 0x00000000,
+    PMPADDR32 = 0x3D0; 0x00000000,
+    PMPADDR33 = 0x3D1; 0x00000000,
+    PMPADDR34 = 0x3D2; 0x00000000,
+    PMPADDR35 = 0x3D3; 0x00000000,
+    PMPADDR36 = 0x3D4; 0x00000000,
+    PMPADDR37 = 0x3D5; 0x00000000,
+    PMPADDR38 = 0x3D6; 0x00000000,
+    PMPADDR39 = 0x3D7; 0x00000000,
+    PMPADDR40 = 0x3D8; 0x00000000,
+    PMPADDR41 = 0x3D9; 0x00000000,
+    PMPADDR42 = 0x3DA; 0x00000000,
+    PMPADDR43 = 0x3DB; 0x00000000,
+    PMPADDR44 = 0x3DC; 0x00000000,
+    PMPADDR45 = 0x3DD; 0x00000000,
+    PMPADDR46 = 0x3DE; 0x00000000,
+    PMPADDR47 = 0x3DF; 0x00000000,
+    PMPADDR48 = 0x3E0; 0x00000000,
+    PMPADDR49 = 0x3E1; 0x00000000,
+    PMPADDR50 = 0x3E2; 0x00000000,
+    PMPADDR51 = 0x3E3; 0x00000000,
+    PMPADDR52 = 0x3E4; 0x00000000,
+    PMPADDR53 = 0x3E5; 0x00000000,
+    PMPADDR54 = 0x3E6; 0x00000000,
+    PMPADDR55 = 0x3E7; 0x00000000,
+    PMPADDR56 = 0x3E8; 0x00000000,
+    PMPADDR57 = 0x3E9; 0x00000000,
+    PMPADDR58 = 0x3EA; 0x00000000,
+    PMPADDR59 = 0x3EB; 0x00000000,
+    PMPADDR60 = 0x3EC; 0x00000000,
+    PMPADDR61 = 0x3ED; 0x00000000,
+    PMPADDR62 = 0x3EE; 0x00000000,
+    PMPADDR63 = 0x3EF; 0x00000000,
     // Machine Counter/Timers
 
     // Machine Counter Setup
@@ -743,6 +820,7 @@ pub fn step(sim: &mut Simulator) -> bool{
                             rd = sim.csr[&imm]; //TODO zero extend
                         }
                         sim.csr.insert(imm, rs1);
+                        println!("INFO: executed CSRRW(I) on {}", sim.csr_address_to_name[&imm]);
                     },
                     0b10 => {
                         // CSRRS(I)
@@ -750,7 +828,7 @@ pub fn step(sim: &mut Simulator) -> bool{
                         if rs1i != 0 { // THIS ALSO CHECKS THE uimm AS PER THE SPEC
                             sim.csr.insert(imm, sim.csr[&imm] | rs1);
                         }
-                        
+                        println!("INFO: executed CSRRS(I) on {}", sim.csr_address_to_name[&imm]);
                     },
                     0b11 => {
                         // CSRRC(I)
@@ -758,6 +836,7 @@ pub fn step(sim: &mut Simulator) -> bool{
                         if rs1i != 0 {
                             sim.csr.insert(imm, sim.csr[&imm] & !rs1);
                         }
+                        println!("INFO: executed CSRRC(I) on {}", sim.csr_address_to_name[&imm]);
                     },
                     _ => unreachable!(),
                 }
