@@ -33,21 +33,21 @@ fn cli_help() {
 }
 
 enum SimMode {
-    NONE,
-    HTML_SERVER,
-    SELF_TEST,
+    None,
+    HtmlServer,
+    SelfTest,
 }
 
 fn main() -> ExitCode {
     let args: Vec<String> = env::args().collect();
     println!("args: {:?}", args);
-    let mut sim_mode = SimMode::NONE;
+    let mut sim_mode = SimMode::None;
 
     match args.len() {
         3 => {
             match args[1].as_str() {
-                "-H" => sim_mode=SimMode::HTML_SERVER,
-                "-T" => sim_mode=SimMode::SELF_TEST,
+                "-H" => sim_mode=SimMode::HtmlServer,
+                "-T" => sim_mode=SimMode::SelfTest,
                 _ => cli_help(),
             }
         }
@@ -57,13 +57,13 @@ fn main() -> ExitCode {
     }
     let mut exit_code = ExitCode::from(1);
     match sim_mode {
-        SimMode::HTML_SERVER => {
+        SimMode::HtmlServer => {
             match args[2].parse() {
                 Ok(port_number) => server_loop(port_number),
                 _ => cli_help()
             }
             },
-        SimMode::SELF_TEST => {exit_code = self_test(args[2].as_str());},
+        SimMode::SelfTest => {exit_code = self_test(args[2].as_str());},
         _ => {}
     }
     return exit_code;
@@ -212,7 +212,7 @@ fn handle_connection(next_index: &mut i32, mut stream: TcpStream, simulators: &m
                     println!("load image at: {:?}", location);
                     
                     let mut sim = &mut simulators.get_mut(&simulator_key).unwrap();
-                    load_image(&mut sim, location);                    
+                    _ = load_image(&mut sim, location);                    
                 }
                 _ => {
                     println!("ERROR unknown request");

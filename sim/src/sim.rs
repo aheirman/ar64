@@ -340,8 +340,8 @@ fn translate_address(csr : HashMap<u32, u64>, mem : Vec<u8>, va : u64, access_ty
             if (pte_r != 0) || (pte_x != 0) {
                 // step 5
 
-                let SUM = (mstatus & 0x40000) != 1; // permit Supervisor User Memory access
-                let MXR = (mstatus & 0x80000) != 1; // Make eXecutable Readable
+                let sum = (mstatus & 0x40000) != 1; // permit Supervisor User Memory access
+                let mxr = (mstatus & 0x80000) != 1; // Make eXecutable Readable
 
                 // TODO
                 // MXR = 1 --> loads from either readable or executable will succeed
