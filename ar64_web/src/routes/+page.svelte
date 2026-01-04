@@ -13,7 +13,7 @@
 	*/
 
 	// TCP
-	$: sim = {log: "", uart_out: "", sim_out: "", mem: [], states: [{last_instruction : "", pc : -1, last_pc : -1, regs : []}, {last_instruction : "", pc : -1, last_pc : -1, regs : []}]}
+	$: sim = {log: "", uart_out: "", sim_out: "", mem: [], csr: [], states: [{last_instruction : "", pc : -1, last_pc : -1, regs : []}, {last_instruction : "", pc : -1, last_pc : -1, regs : []}]}
 
 
 	const send_request = async (task) => {
@@ -87,6 +87,7 @@
 	$: uart_out = String.fromCharCode(...sim.uart_out);
 	$: sim_out = sim.sim_out;
 	$: mem2D = gen2Dmem(sim);
+	$: csr2D = genCSR(sim);
 
 	$: instruction_url = "https://luplab.gitlab.io/rvcodecjs/#q="+sim.states[0].last_instruction
 	
@@ -99,6 +100,22 @@
 			}
 			
 			return mem2D;
+		} 
+		return []
+	}
+	function genCSR(sim) {
+		if (typeof sim !== 'undefined') {
+			const csr2D = [];
+			var csrs_obj = sim['csr']
+			console.log(typeof csrs_obj);
+			console.log(csrs_obj);
+			
+			for(var k in csrs_obj) {
+				csr2D.push([sim['csr_address_to_name'][parseInt(k)], csrs_obj[769]]);
+			}
+			console.log(csr2D)
+			
+			return csr2D;
 		} 
 		return []
 	}
@@ -146,6 +163,16 @@
 						{#each row as v, j}
 							<div>{(v).toString(16).padStart(2,'0')}</div>
 						{/each}
+						</div>
+					</div>
+				{/each}
+			</div>
+			<div class="memory_csr">
+				{#each csr2D as row, i}
+					<div class="memory_row">
+						<div class="row_index">{row[0]}</div>
+						<div class="data_row">
+							<div>{(row[1]).toString(16).padStart(2,'0')}</div>
 						</div>
 					</div>
 				{/each}
@@ -202,6 +229,11 @@
 		line-height: 2;
 	}
 	.memory {
+		display: flex;
+		flex-direction: column;
+		border: 5px solid;
+	}
+	.memory_csr {
 		display: flex;
 		flex-direction: column;
 		border: 5px solid;

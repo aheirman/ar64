@@ -4,62 +4,83 @@
 #![allow(arithmetic_overflow)]
 
 use std::{panic, fs};
+use std::collections::HashMap;
 
 use serde::{Serialize, Deserialize};
 
-mod CsrAddress {
+macro_rules! declare_csr_consts {
+    ($vis:vis $GROUP:ident : &[$T:ty] = [$($name:ident = $value:expr),* $(,)?]) => {
+        mod csr_address {
+            use std::collections::HashMap;
 
+
+        $vis const $GROUP: &[$T] = &[$($name),*];
+        pub fn get_address_to_name() -> HashMap<$T, String>{
+            return HashMap::from([
+                    $(($value, String::from(stringify!($name))),)*
+            ]);
+        }
+
+        $(
+            $vis const $name: $T = $value;
+        )*
+        }
+    };
+}
+
+
+declare_csr_consts!(pub CSR_ADDRESSES: &[u32] = [
     // Supervisor Trap Setup
-    pub const SSTATUS    : usize = 0x100; 
-    pub const SIE        : usize = 0x104; // interrupt-enable register
-    pub const STVEC      : usize = 0x105; // trap handler base address
-    pub const SCONTEREN  : usize = 0x106; // counter enable
+    SSTATUS    = 0x100, 
+    SIE        = 0x104, // interrupt-enable register
+    STVEC      = 0x105, // trap handler base address
+    SCONTEREN  = 0x106, // counter enable
     
     // Supervisor Configuration
-    pub const SENCVFG    : usize = 0x10A; // environment configuration register
+    SENCVFG    = 0x10A, // environment configuration register
 
     // Supervisor Trap Handling
-    pub const SSCRATCH   : usize = 0x140; // scratch reg for supervisor trap handlers
-    pub const SEPC       : usize = 0x141; // Exception program counter
-    pub const SCAUSE     : usize = 0x142; // trap cause
-    pub const STVAL      : usize = 0x143; // bad address or instruction
-    pub const SIP        : usize = 0x144; // interrupt pending
+    SSCRATCH   = 0x140, // scratch reg for supervisor trap handlers
+    SEPC       = 0x141, // Exception program counter
+    SCAUSE     = 0x142, // trap cause
+    STVAL      = 0x143, // bad address or instruction
+    SIP        = 0x144, // interrupt pending
 
     // Supervisor Protection and Translation
-    pub const SATP       : usize = 0x180; // Address Translation and Protection
+    SATP       = 0x180, // Address Translation and Protection
 
     // Debut/Trace Registers
-    pub const SCONTEXT   : usize = 0x5A8; // 
+    SCONTEXT   = 0x5A8, // 
     // Hypervisor *
 
     // Machine Information Registers
-    //pub const MVENDORID : usize = 0xF11; // vendor ID
-    //pub const MARCHID   : usize = 0xF12; // arch ID
-    //pub const MIMPID    : usize = 0xF13; // implementation ID
-    pub const MHARTID    : usize = 0xF14;
-    //pub const MCONFIGPTR = 0xF15; // physical address of config ptr, not yet standardized!
+    //MVENDORID = 0xF11, // vendor ID
+    //MARCHID   = 0xF12, // arch ID
+    //MIMPID    = 0xF13, // implementation ID
+    MHARTID    = 0xF14,
+    //MCONFIGPTR = 0xF15, // physical address of config ptr, not yet standardized!
 
     //Machine Trap Setup
-    pub const MSTATUS    : usize = 0x300; // HART operating state
-    pub const MISA       : usize = 0x301; // WARL, ISA and extensions
-    pub const MEDELEG    : usize = 0x302; // WARL, exception delegation reg, If AND ONLY IF S-mode exists
-    pub const MIDELEG    : usize = 0x303; // WARL, interrupt delegation reg, If AND ONLY IF S-mode exists
-    pub const MIE        : usize = 0x304; // WARL, interrupt enable
-    pub const MTVEC      : usize = 0x305; // WARL, trap handler base address reg
-    pub const MCOUNTEREN : usize = 0x306; // counter enable
+    MSTATUS    = 0x300, // HART operating state
+    MISA       = 0x301, // WARL, ISA and extensions
+    MEDELEG    = 0x302, // WARL, exception delegation reg, If AND ONLY IF S-mode exists
+    MIDELEG    = 0x303, // WARL, interrupt delegation reg, If AND ONLY IF S-mode exists
+    MIE        = 0x304, // WARL, interrupt enable
+    MTVEC      = 0x305, // WARL, trap handler base address reg
+    MCOUNTEREN = 0x306, // counter enable
 
     // Machine Trap Handling
-    pub const MSCRATCH  : usize = 0x340; // register for trap handler
-    pub const MEPC      : usize = 0x341; // WARL; machine exception program counter
-    pub const MCAUSE    : usize = 0x342; // WLRL; trap cause
-    //pub const MTVAL   : usize = 0x343; // WARL; bad address or instruction; optional
-    pub const MIP       : usize = 0x344; // WARL; interrupt pending
-    // pub const MTINST : usize = 0x34A; // Hypervisor
-    // pub const MTVAL2 : usize = 0x34B; // Hypervisor
+    MSCRATCH  = 0x340, // register for trap handler
+    MEPC      = 0x341, // WARL, machine exception program counter
+    MCAUSE    = 0x342, // WLRL, trap cause
+    //MTVAL   = 0x343, // WARL, bad address or instruction, optional
+    MIP       = 0x344, // WARL, interrupt pending
+    // MTINST = 0x34A, // Hypervisor
+    // MTVAL2 = 0x34B, // Hypervisor
 
     // Machine Configuration
-    pub const MENVCFG   : usize = 0x30A; // environment configuration register
-    //pub const  MSECCFG    = 0x747; // security configuration reg
+    MENVCFG   = 0x30A, // environment configuration register
+    // MSECCFG    = 0x747, // security configuration reg
 
     // Machine Memory Protection
 
@@ -70,18 +91,19 @@ mod CsrAddress {
     // Debug/Trace Registers
 
     // Debug Mode Registers
-}
+]);
 
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Simulator {
-    pub states:   Vec<CpuState>,
-    pub mem:      Vec<u8>,
-    pub csr:      Vec<u64>,
-    pub log:      String,
-    pub sim_out:  String,
-    pub uart_out: Vec<u8>,
-    pub state:    bool,
+    pub states:              Vec<CpuState>,
+    pub mem:                 Vec<u8>,
+    pub csr:                 HashMap<u32, u64>,
+    pub csr_address_to_name: HashMap<u32, String>,
+    pub log:                 String,
+    pub sim_out:             String,
+    pub uart_out:            Vec<u8>,
+    pub state:               bool,
 }
 
 
@@ -124,11 +146,11 @@ pub fn default_cpu_state() -> CpuState {
         };
 }
 
-fn default_csr() -> Vec<u64> {
-    let mut csr = vec![0;4096];
+fn default_csr() -> HashMap<u32, u64> {
+    let mut csr = HashMap::new();
 
     // 64 bit, BV64I, S, U
-    csr[CsrAddress::MISA ] = 0b10 << 62 | 1 << 8 | 1 << 18 | 1 << 20;
+    csr.insert(csr_address::MISA, 0b10 << 62 | 1 << 8 | 1 << 18 | 1 << 20);
     return csr;
 }
 
@@ -142,6 +164,7 @@ pub fn default_sim() -> Simulator {
         // fill mem with NOP
         mem: vec![0; 8192],
         csr: default_csr(),
+        csr_address_to_name: csr_address::get_address_to_name(),
         log: String::from("OK"),
         sim_out: String::from(""),
         uart_out: vec![],
@@ -156,10 +179,10 @@ pub fn default_sim() -> Simulator {
 
 
 
-fn handle_trap(pc : u64, state: &mut CpuState, csr : &mut Vec<u64>) -> u64{
+fn handle_trap(pc : u64, state: &mut CpuState, csr : &mut HashMap<u32, u64>) -> u64{
 
 
-    //let mcause_exepction_code : u64 = csr[CsrAddress::MCAUSE ] & 0x7FFFFFFFFFFFFFFF;
+    //let mcause_exepction_code : u64 = csr.insert(csr_address::MCAUSE ] & 0x7FFFFFFFFFFFFFFF;
 
     //TODO: handle MEDELEG & 
     
@@ -196,7 +219,7 @@ fn handle_trap(pc : u64, state: &mut CpuState, csr : &mut Vec<u64>) -> u64{
         *
         */
 
-    let mtvec : u64 = csr[CsrAddress::MTVEC ];
+    let mtvec : u64 = csr[&csr_address::MTVEC ];
     let mtvec_mode  : u8  =(mtvec &  0b11) as u8;
     let mtvec_base  : u64 = mtvec & !0b11;
     
@@ -209,7 +232,7 @@ fn handle_trap(pc : u64, state: &mut CpuState, csr : &mut Vec<u64>) -> u64{
 
     let is_synchronous_exception = true;
 
-    csr[CsrAddress::MEPC]   = pc & !0b11; // IALIGN is 32 bit
+    csr.insert(csr_address::MEPC, pc & !0b11); // IALIGN is 32 bit
 
     /*
         *      00: U
@@ -217,7 +240,7 @@ fn handle_trap(pc : u64, state: &mut CpuState, csr : &mut Vec<u64>) -> u64{
         *      10: RESERVED
         *      11: M
         */
-    csr[CsrAddress::MCAUSE] = cause;
+    csr.insert(csr_address::MCAUSE, cause);
     
     let mut npc = 0;
     match mtvec_mode {
@@ -257,7 +280,7 @@ fn handle_trap(pc : u64, state: &mut CpuState, csr : &mut Vec<u64>) -> u64{
 // 0 read
 // 1 write
 // 2 execute
-fn translate_address(csr : Vec<u64>, mem : Vec<u8>, va : u64, access_type : u8) -> u64{
+fn translate_address(csr : HashMap<u32, u64>, mem : Vec<u8>, va : u64, access_type : u8) -> u64{
     // Sv39
     const PAGESIZE: u64 = 4096;
     const LEVELS:   u64 = 3;
@@ -265,8 +288,8 @@ fn translate_address(csr : Vec<u64>, mem : Vec<u8>, va : u64, access_type : u8) 
 
 
     // Supervisor Address Translation and Protection register
-    let satp    = csr[CsrAddress::SATP    ];
-    let mstatus = csr[CsrAddress::MSTATUS ];
+    let satp    = csr[&csr_address::SATP    ];
+    let mstatus = csr[&csr_address::MSTATUS ];
 
     // physical page number
     let satp_ppn   = satp & 0xfffffffffff; // bottom 44 bits
@@ -680,7 +703,7 @@ pub fn step(sim: &mut Simulator) {
 
                             // TODO: raise illegal instruction exception when TSR=1 in mstatus
                             
-                            npc = Some(csr[CsrAddress::SEPC ]);
+                            npc = Some(csr[&csr_address::SEPC ]);
                             println!("ERROR! unimplemented, line: {}", line!());
                         } else if imm == 0b001100000010 { // MRET 18.6.4
                             // new privilege mode based on MPP and MPV in mstatus ro mstatush
@@ -689,7 +712,7 @@ pub fn step(sim: &mut Simulator) {
                             // mie=mpie
                             // mpie=1
                             // priv = new_privilege_mode;
-                            npc = Some(csr[CsrAddress::MEPC ]);
+                            npc = Some(csr[&csr_address::MEPC ]);
                         } else{
                             println!("ERROR! incorrect func3!, line: {}", line!());
                         }
@@ -703,23 +726,23 @@ pub fn step(sim: &mut Simulator) {
                     0b01 => {
                         // CSRRW(I)
                         if rdi != 0 {
-                            rd = sim.csr[imm as usize]; //TODO zero extend
+                            rd = sim.csr[&imm]; //TODO zero extend
                         }
-                        sim.csr[imm as usize] = rs1;
+                        sim.csr.insert(imm, rs1);
                     },
                     0b010 => {
                         // CSRRS(I)
-                        rd = sim.csr[imm as usize]; //TODO zero extend
+                        rd = sim.csr[&imm]; //TODO zero extend
                         if rs1i != 0 { // THIS ALSO CHECKS THE uimm AS PER THE SPEC
-                            sim.csr[imm as usize] |= rs1;
+                            sim.csr.insert(imm, sim.csr[&imm] | rs1);
                         }
                         
                     },
                     0b011 => {
                         // CSRRC(I)
-                        rd = sim.csr[imm as usize]; //TODO zero extend
+                        rd = sim.csr[&imm]; //TODO zero extend
                         if rs1i != 0 {
-                            sim.csr[imm as usize] = sim.csr[imm as usize] & !rs1;
+                            sim.csr.insert(imm, sim.csr[&imm] & !rs1);
                         }
                     },
                     _ => unreachable!(),
