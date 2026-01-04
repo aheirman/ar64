@@ -146,9 +146,12 @@ pub fn default_cpu_state() -> CpuState {
         };
 }
 
-fn default_csr() -> HashMap<u32, u64> {
+fn default_csr(address_to_name : &HashMap<u32, String>) -> HashMap<u32, u64> {
     let mut csr = HashMap::new();
 
+    for k in address_to_name.keys() {
+        csr.insert(*k, 0);
+    }
     // 64 bit, BV64I, S, U
     csr.insert(csr_address::MISA, 0b10 << 62 | 1 << 8 | 1 << 18 | 1 << 20);
     return csr;
@@ -159,12 +162,13 @@ pub fn default_sim() -> Simulator {
     for i in 0..1 {
         states.push(default_cpu_state());
     }
+    let address_to_name = csr_address::get_address_to_name();
     return Simulator{
         states: states,
         // fill mem with NOP
         mem: vec![0; 8192],
-        csr: default_csr(),
-        csr_address_to_name: csr_address::get_address_to_name(),
+        csr: default_csr(&address_to_name),
+        csr_address_to_name: address_to_name,
         log: String::from("OK"),
         sim_out: String::from(""),
         uart_out: vec![],
