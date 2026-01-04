@@ -477,6 +477,7 @@ pub fn step(sim: &mut Simulator) {
 
 
     for i in 0..states.len(){ // step all HARTs
+        println!("INFO: step for hart {}", i);
         let mut state = &mut states[i];
         
         // fetch
@@ -610,7 +611,7 @@ pub fn step(sim: &mut Simulator) {
                 let addr = pc + imm as i64 as u64;
 
                 // BEQ BNE BLT BGE BLTU BGEU
-                println!("BEQ+: r{:}:{:} op r{:}:{:}; addr: {:X}={:X}+{}-4", rs1i, rs1, rs2i, rs2, addr, pc, imm);
+                println!("BEQ+: r{:}:{:} op r{:}:{:}; addr: {:X}={:X}+{:X}-4", rs1i, rs1, rs2i, rs2, addr, pc, imm);
                 match func3 {
                     0b000 => { if  rs1 == rs2 {npc = Some(addr);} }
                     0b001 => { if  rs1 != rs2 {npc = Some(addr);} }
