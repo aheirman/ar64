@@ -161,7 +161,8 @@ fn handle_trap(pc : u64, state: &mut CpuState, csr : &mut Vec<u64>) -> u64{
 
     //let mcause_exepction_code : u64 = csr[CsrAddress::MCAUSE ] & 0x7FFFFFFFFFFFFFFF;
 
-    //TODO: handle MEDELEG & MIDELEG
+    //TODO: handle MEDELEG & 
+    
 
     // When a hart is executing in privilege mode x, interrupts are globally enabled when xIE=1 and globally disabled when xIE=0
     // nterrupts for lower-privilege modes, w<x, are always globally disabled
@@ -681,10 +682,14 @@ pub fn step(sim: &mut Simulator) {
                             
                             npc = Some(csr[CsrAddress::SEPC ]);
                             println!("ERROR! unimplemented, line: {}", line!());
-                        } else if imm == 0b001100000010 { // MRET
-                            
+                        } else if imm == 0b001100000010 { // MRET 18.6.4
+                            // new privilege mode based on MPP and MPV in mstatus ro mstatush
+                            // mpv=0
+                            // mpp=0
+                            // mie=mpie
+                            // mpie=1
+                            // priv = new_privilege_mode;
                             npc = Some(csr[CsrAddress::MEPC ]);
-                            println!("ERROR! unimplemented, line: {}", line!());
                         } else{
                             println!("ERROR! incorrect func3!, line: {}", line!());
                         }
